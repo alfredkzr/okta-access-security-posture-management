@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Global dark mode for form elements */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: rgb(31 41 55);  /* gray-800 */
+  color: rgb(243 244 246);          /* gray-100 */
+  border-color: rgb(55 65 81);      /* gray-700 */
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgb(107 114 128);          /* gray-500 */
+}
+
+.dark select option {
+  background-color: rgb(31 41 55);
+  color: rgb(243 244 246);
+}
+
+/* Scrollbar for dark mode */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: rgb(17 24 39);        /* gray-900 */
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgb(55 65 81);        /* gray-700 */
+  border-radius: 4px;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgb(75 85 99);        /* gray-600 */
+}
