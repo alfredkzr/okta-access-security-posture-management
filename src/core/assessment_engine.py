@@ -12,6 +12,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.constants import extract_app_name, extract_user_email, requires_mfa
 from src.core.log_analyzer import analyze_logs, is_inactive
 from src.core.okta_client import OktaClient
 from src.core.policy_simulator import PolicySimulator
@@ -172,9 +173,8 @@ async def _persist_user_data(
     user = data.user
     assert user is not None
 
-    profile = user.get("profile", {})
     user_id = user["id"]
-    user_email = profile.get("email", profile.get("login", data.email))
+    user_email = extract_user_email(user) or data.email
 
     # Pre-scan: resolve existing impacts for this user, scoped to scenarios being tested
     scenario_names = list({sd.scenario_name for sd in data.sims})
@@ -183,7 +183,9 @@ async def _persist_user_data(
     )
     vulnerability_ids: set[uuid.UUID] = set(pre_scan_vuln_ids)
     violations_found = 0
+    new_violations_found = 0
     inactive_apps = 0
+    new_violation_sims: list[_SimData] = []  # only truly new vulns for notification
 
     # Persist simulation results
     for sd in data.sims:
@@ -192,7 +194,7 @@ async def _persist_user_data(
             access_decision = AccessDecision(sd.access_decision)
 
         app_id = sd.app.get("id", "")
-        app_name = sd.app.get("label", sd.app.get("name", ""))
+        app_name = extract_app_name(sd.app)
 
         assessment = AssessmentResult(
             id=uuid.uuid4(),
@@ -223,12 +225,12 @@ async def _persist_user_data(
                 severity=severity.value,
                 scenario_risk_level=sd.scenario_risk_level,
                 affected_user_count=1,
-                requires_mfa=sd.factor_mode is not None and sd.factor_mode != "" and sd.factor_mode != "1FA",
+                requires_mfa=requires_mfa(sd.factor_mode),
                 phishing_resistant=sd.phishing_resistant,
             )
             risk_score = calculate_risk_score(risk_input)
 
-            vuln, _impact = await vulnerability_engine.record_policy_violation(
+            vuln, _impact, is_new = await vulnerability_engine.record_policy_violation(
                 db_session=db_session,
                 scan_id=scan_id,
                 user=user,
@@ -240,6 +242,9 @@ async def _persist_user_data(
             )
             vulnerability_ids.add(vuln.id)
             violations_found += 1
+            if is_new:
+                new_violations_found += 1
+                new_violation_sims.append(sd)
 
     # Persist inactive app user findings
     for ld in data.logs:
@@ -250,7 +255,7 @@ async def _persist_user_data(
             )
             risk_score = calculate_risk_score(risk_input)
 
-            vuln, _impact = await vulnerability_engine.record_inactive_app_user(
+            vuln, _impact, _is_new = await vulnerability_engine.record_inactive_app_user(
                 db_session=db_session,
                 scan_id=scan_id,
                 user=user,
@@ -268,41 +273,41 @@ async def _persist_user_data(
 
     await db_session.flush()
 
-    # Fire notification for vulnerabilities (fire-and-forget, never blocks scan)
-    if violations_found > 0:
+    # Fire notification only for NEWLY CREATED vulnerabilities (not re-detections
+    # of existing ones). This prevents duplicate webhook noise on every re-scan.
+    if new_violations_found > 0:
         try:
             from src.core.notifier import dispatch as notify
 
             vuln_details = []
             max_risk_score = 0
-            for sd in data.sims:
-                if sd.access_decision == "ALLOW" and sd.rule_action is not None:
-                    sev = determine_policy_violation_severity(
-                        sd.factor_mode, sd.phishing_resistant,
-                    ).value
-                    app_name = sd.app.get("label", sd.app.get("name", ""))
-                    risk_input = RiskInput(
-                        severity=sev,
-                        scenario_risk_level=sd.scenario_risk_level,
-                        affected_user_count=1,
-                        requires_mfa=sd.factor_mode is not None and sd.factor_mode != "" and sd.factor_mode != "1FA",
-                        phishing_resistant=sd.phishing_resistant,
-                    )
-                    score = calculate_risk_score(risk_input)
-                    max_risk_score = max(max_risk_score, score)
-                    vuln_details.append({
-                        "title": f"Policy allows access: {app_name}",
-                        "severity": sev,
-                        "app_name": app_name,
-                        "rule_name": sd.sim_result.rule_name,
-                        "scenario_name": sd.scenario_name,
-                        "risk_score": score,
-                    })
+            for sd in new_violation_sims:
+                sev = determine_policy_violation_severity(
+                    sd.factor_mode, sd.phishing_resistant,
+                ).value
+                app_name = extract_app_name(sd.app)
+                risk_input = RiskInput(
+                    severity=sev,
+                    scenario_risk_level=sd.scenario_risk_level,
+                    affected_user_count=1,
+                    requires_mfa=requires_mfa(sd.factor_mode),
+                    phishing_resistant=sd.phishing_resistant,
+                )
+                score = calculate_risk_score(risk_input)
+                max_risk_score = max(max_risk_score, score)
+                vuln_details.append({
+                    "title": f"Policy allows access: {app_name}",
+                    "severity": sev,
+                    "app_name": app_name,
+                    "rule_name": sd.sim_result.rule_name,
+                    "scenario_name": sd.scenario_name,
+                    "risk_score": score,
+                })
 
             asyncio.create_task(notify("new_vulnerabilities", {
                 "scan_id": str(scan_id),
                 "user_email": user_email,
-                "count": violations_found,
+                "count": new_violations_found,
                 "max_risk_score": max_risk_score,
                 "vulnerabilities": vuln_details,
             }, db_session))

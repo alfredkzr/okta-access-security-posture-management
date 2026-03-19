@@ -45,8 +45,8 @@ class AssessmentResult(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    scan = relationship("Scan", lazy="selectin")
-    scenario = relationship("Scenario", lazy="selectin")
+    scan = relationship("Scan", lazy="select")
+    scenario = relationship("Scenario", lazy="select")
 
     __table_args__ = (
         Index("ix_assessment_results_scan_id", "scan_id"),
@@ -54,4 +54,6 @@ class AssessmentResult(Base):
         Index("ix_assessment_results_app_id", "app_id"),
         Index("ix_assessment_results_access_decision", "access_decision"),
         Index("ix_assessment_results_scan_user", "scan_id", "user_id"),
+        Index("ix_assessment_results_created_at", "created_at"),
+        Index("ix_assessment_results_user_email_created_at", "user_email", "created_at"),
     )

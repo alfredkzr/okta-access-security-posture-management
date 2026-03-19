@@ -17,12 +17,6 @@ class Settings(BaseSettings):
     # Encryption
     encryption_key: str = ""
 
-    # LLM
-    llm_model: str = "azure/gpt-4o"
-    llm_temperature: float = 0.1
-    llm_max_tokens: int = 16384
-    llm_timeout: int = 120
-
     # Database
     database_url: str = "postgresql+asyncpg://aspm:aspm@db:5432/aspm"
 
@@ -70,7 +64,7 @@ class Settings(BaseSettings):
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()

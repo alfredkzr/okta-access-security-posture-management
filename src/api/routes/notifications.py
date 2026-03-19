@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies import get_db, require_auth
+from src.api.dependencies import get_db, require_admin, require_auth
 from src.api.errors import AppError
 from src.models.notification_channel import NotificationChannel
 from src.schemas.notifications import (
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/v1/notifications", tags=["notifications"])
 
 @router.get("/channels", response_model=list[NotificationChannelResponse])
 async def list_channels(
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -33,7 +33,7 @@ async def list_channels(
 @router.post("/channels", response_model=NotificationChannelResponse, status_code=201)
 async def create_channel(
     body: NotificationChannelCreate,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     channel = NotificationChannel(
@@ -53,7 +53,7 @@ async def create_channel(
 async def update_channel(
     channel_id: uuid.UUID,
     body: NotificationChannelUpdate,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -82,7 +82,7 @@ async def update_channel(
 @router.delete("/channels/{channel_id}", status_code=204)
 async def delete_channel(
     channel_id: uuid.UUID,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -92,13 +92,13 @@ async def delete_channel(
     if not channel:
         raise AppError(code="NOT_FOUND", message="Notification channel not found", status=404)
     await db.delete(channel)
-    await db.flush()
+    await db.commit()
 
 
 @router.post("/channels/{channel_id}/test")
 async def test_channel(
     channel_id: uuid.UUID,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     from src.core.notifier import dispatch_test

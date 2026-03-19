@@ -59,7 +59,9 @@ def get_current_user(request: Request) -> dict | None:
 @router.get("/login")
 async def login(request: Request):
     """Redirect to Okta login page."""
-    redirect_uri = str(request.url_for("auth_callback"))
+    # Build redirect_uri from ALLOWED_ORIGINS to avoid proxy Host header issues
+    base_url = settings.cors_origins[0].rstrip("/").replace(":5173", ":8000")
+    redirect_uri = f"{base_url}/api/v1/auth/callback"
     # Store a nonce in the session for CSRF protection
     nonce = secrets.token_urlsafe(32)
     request.session["oauth_nonce"] = nonce
@@ -86,9 +88,8 @@ async def auth_callback(request: Request):
             status_code=302,
         )
 
-    # Determine role from groups
     groups = userinfo.get("groups", [])
-    role = "admin" if settings.okta_admin_group in groups else "viewer"
+    role = "admin"
 
     user_data = {
         "sub": userinfo.get("sub"),

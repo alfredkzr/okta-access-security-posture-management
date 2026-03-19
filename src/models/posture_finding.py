@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
+from src.models.vulnerability import Severity as FindingSeverity  # Re-export for backwards compat
 
 
 class CheckCategory(str, enum.Enum):
@@ -18,13 +19,6 @@ class CheckCategory(str, enum.Enum):
     DEVICE_TRUST = "device_trust"
     IDP_CONFIG = "idp_config"
     SECURITY_EVENTS = "security_events"
-
-
-class FindingSeverity(str, enum.Enum):
-    CRITICAL = "CRITICAL"
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
 
 
 class FindingStatus(str, enum.Enum):

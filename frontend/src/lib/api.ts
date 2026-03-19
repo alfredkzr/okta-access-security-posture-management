@@ -138,6 +138,15 @@ export interface DashboardSummary {
   okta_health: { status: string; message?: string } | null;
 }
 
+export interface Report {
+  id: string;
+  scan_id: string;
+  report_type: string;
+  file_path: string | null;
+  generated_at: string;
+  created_at: string;
+}
+
 export interface HealthCheck {
   status: string;
   database: string;

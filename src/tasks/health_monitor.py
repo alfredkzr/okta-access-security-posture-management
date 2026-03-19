@@ -131,7 +131,7 @@ async def _dispatch_notification(ctx: dict, health_data: dict, previous_status: 
     This is best-effort; failures are logged but do not propagate.
     """
     try:
-        # Try to import the notifier if it exists
+        from src.config import settings as app_settings
         from src.services import notifier
 
         await notifier.dispatch(
@@ -141,7 +141,7 @@ async def _dispatch_notification(ctx: dict, health_data: dict, previous_status: 
                 "current_status": health_data["status"],
                 "rate_limit_remaining_pct": health_data.get("rate_limit_remaining_pct"),
                 "rate_limit_remaining": health_data.get("rate_limit_remaining"),
-                "okta_org": settings.okta_org,
+                "okta_org": app_settings.okta_org,
                 "checked_at": health_data["checked_at"],
             },
         )

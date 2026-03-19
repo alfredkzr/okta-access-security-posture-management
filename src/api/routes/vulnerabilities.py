@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.api.audit import log_audit
-from src.api.dependencies import get_db, require_auth, require_auth
+from src.api.dependencies import get_db, require_admin, require_auth
 from src.api.errors import AppError
 from src.core import vulnerability_engine
 from src.models.vulnerability import Severity, Vulnerability, VulnerabilityCategory, VulnerabilityStatus
@@ -136,7 +136,7 @@ async def list_vulnerabilities(
 @router.post("/reconcile")
 async def reconcile_vulnerability_statuses(
     request: Request,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Reconcile all vulnerability statuses based on actual active impact counts.
@@ -187,7 +187,7 @@ async def update_vulnerability_status(
     vuln_id: uuid.UUID,
     body: VulnerabilityUpdateRequest,
     request: Request,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     valid_statuses = {"ACTIVE", "CLOSED", "ACKNOWLEDGED"}
@@ -261,8 +261,6 @@ async def _auto_reconcile(db: AsyncSession, vuln: Vulnerability) -> None:
 
 async def _auto_reconcile_all(db: AsyncSession) -> None:
     """Reconcile all ACTIVE vulnerabilities that have zero active impacts."""
-    from sqlalchemy import literal_column
-
     subq = (
         select(
             Vulnerability.id,

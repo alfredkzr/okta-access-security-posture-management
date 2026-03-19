@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 class ReportGenerateRequest(BaseModel):
     scan_id: uuid.UUID
-    report_type: str  # csv_full, csv_violations, csv_inactive, csv_posture, pdf, json, ai_summary
+    report_type: str  # csv_full, csv_violations, csv_inactive, csv_posture, pdf, json
 
 
 class ReportResponse(BaseModel):

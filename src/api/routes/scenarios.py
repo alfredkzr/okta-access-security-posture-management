@@ -8,7 +8,7 @@ from sqlalchemy import delete, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.audit import log_audit
-from src.api.dependencies import get_db, require_auth, require_auth
+from src.api.dependencies import get_db, require_admin, require_auth
 from src.api.errors import AppError
 from src.models.scenario import Scenario
 from src.schemas.scenarios import ScenarioCreate, ScenarioResponse, ScenarioUpdate
@@ -35,7 +35,7 @@ async def list_scenarios(
 async def create_scenario(
     body: ScenarioCreate,
     request: Request,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     scenario = Scenario(**body.model_dump())
@@ -59,7 +59,7 @@ async def update_scenario(
     scenario_id: uuid.UUID,
     body: ScenarioUpdate,
     request: Request,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Scenario).where(Scenario.id == scenario_id))
@@ -113,7 +113,7 @@ async def update_scenario(
 async def delete_scenario(
     scenario_id: uuid.UUID,
     request: Request,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Scenario).where(Scenario.id == scenario_id))
@@ -137,7 +137,7 @@ async def delete_scenario(
 @router.post("/import", response_model=list[ScenarioResponse], status_code=201)
 async def import_scenarios(
     scenarios: list[ScenarioCreate] = Body(...),
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     created = []
@@ -148,13 +148,21 @@ async def import_scenarios(
     await db.flush()
     for s in created:
         await db.refresh(s)
+
+    actor = current_user.get("email", "unknown")
+    await log_audit(
+        db, actor, "scenario_created", "scenario", "import",
+        details={"count": len(created), "names": [s.name for s in created]},
+        ip_address="unknown",
+    )
+
     return created
 
 
 @router.post("/reset", response_model=list[ScenarioResponse], status_code=201)
 async def reset_scenarios(
     request: Request,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete all existing scenarios and recreate the defaults."""

@@ -72,36 +72,45 @@ async def on_startup():
     from src.models.base import Base
     import src.models  # noqa: F401
 
+    import sqlalchemy as sa
+
     async with engine.begin() as conn:
+        # Create tables first (handles fresh DB)
+        await conn.run_sync(Base.metadata.create_all)
+
+        # Migrations for existing databases — guarded so they're safe on fresh DBs
         # Add CLOSED to the vulnerabilitystatus enum if it doesn't exist yet
         await conn.execute(
-            __import__("sqlalchemy").text(
+            sa.text(
                 "DO $$ BEGIN "
+                "IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'vulnerabilitystatus') THEN "
                 "IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'CLOSED' "
                 "AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'vulnerabilitystatus')) THEN "
                 "ALTER TYPE vulnerabilitystatus ADD VALUE 'CLOSED'; "
-                "END IF; END $$;"
+                "END IF; END IF; END $$;"
             )
         )
-        await conn.run_sync(Base.metadata.create_all)
         # Make scenarios.risk_level nullable for existing tables
         await conn.execute(
-            __import__("sqlalchemy").text(
-                "ALTER TABLE scenarios ALTER COLUMN risk_level DROP NOT NULL"
+            sa.text(
+                "DO $$ BEGIN "
+                "ALTER TABLE scenarios ALTER COLUMN risk_level DROP NOT NULL; "
+                "EXCEPTION WHEN undefined_table THEN NULL; "
+                "END $$;"
             )
         )
         # Add acknowledged_by column if it doesn't exist yet
         await conn.execute(
-            __import__("sqlalchemy").text(
+            sa.text(
                 "DO $$ BEGIN "
                 "ALTER TABLE vulnerabilities ADD COLUMN acknowledged_by VARCHAR(255); "
-                "EXCEPTION WHEN duplicate_column THEN NULL; "
+                "EXCEPTION WHEN duplicate_column THEN NULL; WHEN undefined_table THEN NULL; "
                 "END $$;"
             )
         )
         # Migrate any existing REMEDIATED vulnerabilities to CLOSED
         await conn.execute(
-            __import__("sqlalchemy").text(
+            sa.text(
                 "UPDATE vulnerabilities SET status = 'CLOSED' WHERE status = 'REMEDIATED'"
             )
         )

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies import get_db, get_okta_client, require_auth, require_auth
+from src.api.dependencies import get_db, get_okta_client, require_admin, require_auth
 from src.api.errors import AppError
 from src.config import settings
 from src.core.okta_client import OktaClient
@@ -35,7 +35,7 @@ async def get_tenant_config(current_user: dict = Depends(require_auth)):
 
 
 @router.put("/tenant", response_model=TenantConfigResponse)
-async def update_tenant_config(body: TenantConfigUpdate, current_user: dict = Depends(require_auth)):
+async def update_tenant_config(body: TenantConfigUpdate, current_user: dict = Depends(require_admin)):
     # Single-tenant mode: config comes from env vars.
     # Validate the payload but do not persist (env vars are read-only at runtime).
     return TenantConfigResponse(
@@ -47,7 +47,7 @@ async def update_tenant_config(body: TenantConfigUpdate, current_user: dict = De
 
 @router.post("/tenant/test")
 async def test_tenant_connection(
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     okta_client: OktaClient = Depends(get_okta_client),
 ):
     try:
@@ -105,7 +105,7 @@ async def health_check(
 @router.post("/reset", status_code=200)
 async def reset_all_data(
     confirm: str = Query(..., description="Must be 'RESET' to confirm"),
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete ALL application data for a fresh start.
@@ -122,20 +122,24 @@ async def reset_all_data(
         )
 
     # Order matters: respect foreign-key constraints (children first).
-    tables = [
-        "vulnerability_impacts",
-        "assessment_results",
-        "posture_findings",
-        "reports",
-        "vulnerabilities",
-        "scans",
-        "jobs",
-        "audit_logs",
-        "notification_channels",
-        "scenarios",
-    ]
-    for table in tables:
-        await db.execute(text(f"DELETE FROM {table}"))
+    # Use ORM delete to avoid SQL injection risk from dynamic table names.
+    from src.models.vulnerability_impact import VulnerabilityImpact
+    from src.models.assessment_result import AssessmentResult
+    from src.models.posture_finding import PostureFinding
+    from src.models.report import Report
+    from src.models.vulnerability import Vulnerability
+    from src.models.scan import Scan
+    from src.models.job import Job
+    from src.models.audit_log import AuditLog
+    from src.models.notification_channel import NotificationChannel
+    from src.models.scenario import Scenario
+    from sqlalchemy import delete
+
+    for model in [
+        VulnerabilityImpact, AssessmentResult, PostureFinding, Report,
+        Vulnerability, Scan, Job, AuditLog, NotificationChannel, Scenario,
+    ]:
+        await db.execute(delete(model))
     await db.commit()
 
     # Re-seed default scenarios
@@ -181,7 +185,7 @@ async def reset_all_data(
 
 
 @router.put("/app-criticality")
-async def update_app_criticality(body: AppCriticalityUpdate, current_user: dict = Depends(require_auth)):
+async def update_app_criticality(body: AppCriticalityUpdate, current_user: dict = Depends(require_admin)):
     try:
         import redis.asyncio as aioredis
 

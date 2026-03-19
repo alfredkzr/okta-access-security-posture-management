@@ -52,7 +52,7 @@ export default function Vulnerabilities() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Vulnerabilities</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500 mt-1">Security vulnerabilities detected across your Okta environment</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Security vulnerabilities detected across your Okta environment</p>
       </div>
 
       {/* Stat Cards */}
@@ -61,7 +61,7 @@ export default function Vulnerabilities() {
           <div key={card.label} className={cn('rounded-lg border border-gray-200 p-5', card.bg)}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500">{card.label}</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{card.label}</p>
                 <p className={cn('text-2xl font-bold mt-1', card.color)}>
                   {statsLoading ? '...' : card.value}
                 </p>
@@ -118,23 +118,23 @@ export default function Vulnerabilities() {
       {/* Table */}
       <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center text-gray-500 dark:text-gray-400 dark:text-gray-500">Loading vulnerabilities...</div>
+          <div className="p-12 text-center text-gray-500 dark:text-gray-400">Loading vulnerabilities...</div>
         ) : isError ? (
           <div className="p-12 text-center text-red-500 dark:text-red-400">Failed to load vulnerabilities. Please try again.</div>
         ) : !data?.items.length ? (
-          <div className="p-12 text-center text-gray-500 dark:text-gray-400 dark:text-gray-500">No vulnerabilities found matching your filters.</div>
+          <div className="p-12 text-center text-gray-500 dark:text-gray-400">No vulnerabilities found matching your filters.</div>
         ) : (
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Title</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Severity</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Risk Score</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Affected Users</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">App</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Last Detected</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider"></th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Title</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Severity</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Risk Score</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Affected Users</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">App</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Detected</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -158,9 +158,9 @@ export default function Vulnerabilities() {
                   <td className="px-4 py-3">
                     <span className={cn('text-sm font-bold', riskScoreColor(vuln.risk_score))}>{vuln.risk_score}</span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 dark:text-gray-500">{vuln.active_impact_count}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 dark:text-gray-500 max-w-[160px] truncate">{vuln.app_name ?? '---'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">{formatDate(vuln.last_detected)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{vuln.active_impact_count}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-[160px] truncate">{vuln.app_name ?? '---'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{formatDate(vuln.last_detected)}</td>
                   <td className="px-4 py-3">
                     <Link
                       to={`/vulnerabilities/${vuln.id}`}
@@ -179,7 +179,7 @@ export default function Vulnerabilities() {
         {/* Pagination */}
         {data && data.pages > 1 && (
           <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-800 px-4 py-3 bg-gray-50 dark:bg-gray-800/50">
-            <p className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-500">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Page {data.page} of {data.pages} ({data.total} total)
             </p>
             <div className="flex gap-2">

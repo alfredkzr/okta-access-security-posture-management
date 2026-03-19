@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { X, Clock, Users, CheckCircle, XCircle, AlertTriangle, Loader, ChevronRight } from 'lucide-react';
+import { X, Clock, Users, CheckCircle, XCircle, AlertTriangle, Loader } from 'lucide-react';
 import api from '../lib/api';
 import type { Scan } from '../lib/api';
-import { formatDate, statusColor, cn } from '../lib/utils';
+import { formatDate, formatDuration, statusColor, cn } from '../lib/utils';
 
 interface Props {
   scanId: string;
@@ -18,16 +18,6 @@ function statusIcon(status: string) {
     case 'pending': return <Clock className="w-5 h-5 text-gray-400 dark:text-gray-500" />;
     default: return <Clock className="w-5 h-5 text-gray-400 dark:text-gray-500" />;
   }
-}
-
-function formatDuration(seconds: number | null): string {
-  if (seconds === null || seconds === undefined) return '--';
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  if (m < 60) return `${m}m ${s}s`;
-  const h = Math.floor(m / 60);
-  return `${h}h ${m % 60}m`;
 }
 
 export default function ScanDetailModal({ scanId, onClose }: Props) {

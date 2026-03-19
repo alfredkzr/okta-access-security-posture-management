@@ -1,7 +1,28 @@
+import ipaddress
 import uuid
 from datetime import datetime
+from urllib.parse import urlparse
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+
+def _validate_webhook_url(url: str) -> str:
+    """Validate webhook URL is not targeting internal/private networks (SSRF prevention)."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Webhook URL must use http or https, got: {parsed.scheme}")
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("Webhook URL must have a hostname")
+    try:
+        ip = ipaddress.ip_address(hostname)
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            raise ValueError(f"Webhook URL cannot target private/internal address: {ip}")
+    except ValueError as exc:
+        if "does not appear to be" not in str(exc):
+            raise
+        # It's a hostname, not an IP — allow it (DNS resolves at request time)
+    return url
 
 
 class NotificationChannelCreate(BaseModel):
@@ -12,6 +33,11 @@ class NotificationChannelCreate(BaseModel):
     is_active: bool = True
     hmac_secret: str | None = None
     custom_headers: dict[str, str] | None = None
+
+    @field_validator("webhook_url")
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        return _validate_webhook_url(v)
 
     def to_config(self) -> dict:
         """Convert flat fields to config dict for DB storage."""
@@ -28,6 +54,13 @@ class NotificationChannelUpdate(BaseModel):
     is_active: bool | None = None
     hmac_secret: str | None = None
     custom_headers: dict[str, str] | None = None
+
+    @field_validator("webhook_url")
+    @classmethod
+    def validate_url(cls, v: str | None) -> str | None:
+        if v is not None:
+            return _validate_webhook_url(v)
+        return v
 
     def to_config(self, existing_config: dict | None = None) -> dict | None:
         """Convert flat fields to config dict, merging with existing if partial."""

@@ -12,8 +12,6 @@ class ScanConfig(BaseModel):
     include_posture_checks: bool = True
     max_workers: int = 10
     api_delay: float = 0
-    save_individual_reports: bool = False
-    generate_ai_summary: bool = False
 
 
 class ScheduleCreate(BaseModel):

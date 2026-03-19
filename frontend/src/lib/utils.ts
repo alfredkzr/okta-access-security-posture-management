@@ -40,6 +40,16 @@ export function riskScoreColor(score: number): string {
   return 'text-green-600 dark:text-green-400';
 }
 
+export function formatDuration(seconds: number | null): string {
+  if (seconds === null || seconds === undefined) return '--';
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  if (m < 60) return `${m}m ${s}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
+
 export function timeAgo(iso: string): string {
   const now = Date.now();
   const then = new Date(iso).getTime();

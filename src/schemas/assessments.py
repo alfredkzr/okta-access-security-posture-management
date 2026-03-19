@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
 class SingleAssessmentRequest(BaseModel):
@@ -16,7 +16,6 @@ class BatchAssessmentRequest(BaseModel):
     include_posture_checks: bool = True
     max_workers: int = 5
     api_delay: float = 0
-    generate_ai_summary: bool = False
     resume_scan_id: uuid.UUID | None = None
 
 

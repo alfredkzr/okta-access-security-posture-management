@@ -13,6 +13,7 @@ from typing import Any
 
 import structlog
 
+from src.core.constants import PHISHING_RESISTANT_FACTORS
 from src.core.risk_scorer import RiskInput, calculate_risk_score
 from src.models.posture_finding import (
     CheckCategory,
@@ -25,9 +26,6 @@ logger = structlog.get_logger(__name__)
 
 # Okta super admin role type identifier
 SUPER_ADMIN_ROLE = "SUPER_ADMIN"
-
-# Factor types considered phishing-resistant (FIDO2 / Okta FastPass)
-PHISHING_RESISTANT_FACTORS = {"webauthn", "signed_nonce"}
 
 # Max number of super admins before flagging
 SUPER_ADMIN_THRESHOLD = 4

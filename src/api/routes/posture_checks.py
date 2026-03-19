@@ -7,21 +7,14 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies import get_db, require_auth, require_auth
+from src.api.dependencies import get_db, require_admin, require_auth
 from src.api.errors import AppError
+from src.core.constants import SEVERITY_WEIGHTS
 from src.models.posture_finding import FindingSeverity, FindingStatus, PostureFinding
 from src.schemas.common import PaginatedResponse
 from src.schemas.posture import PostureFindingResponse, PostureFindingUpdate, PostureScoreResponse
 
 router = APIRouter(prefix="/api/v1/posture", tags=["posture"])
-
-# Severity weights for score calculation
-_SEVERITY_WEIGHTS = {
-    FindingSeverity.CRITICAL: 15,
-    FindingSeverity.HIGH: 10,
-    FindingSeverity.MEDIUM: 5,
-    FindingSeverity.LOW: 2,
-}
 
 
 @router.get("/findings", response_model=PaginatedResponse)
@@ -86,7 +79,7 @@ async def get_posture_score(
         sev = row[0]
         count = row[1]
         severity_counts[sev.value] = count
-        total_deduction += _SEVERITY_WEIGHTS.get(sev, 0) * count
+        total_deduction += SEVERITY_WEIGHTS.get(sev, 0) * count
 
     score = max(0, 100 - total_deduction)
 
@@ -123,7 +116,7 @@ async def get_finding(
 async def update_finding_status(
     finding_id: uuid.UUID,
     body: PostureFindingUpdate,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     valid_statuses = {"OPEN", "RESOLVED", "ACKNOWLEDGED", "FALSE_POSITIVE"}

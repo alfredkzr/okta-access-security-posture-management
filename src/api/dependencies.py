@@ -38,12 +38,5 @@ def require_auth(request: Request) -> dict:
 
 
 def require_admin(user: dict = Depends(require_auth)) -> dict:
-    """Dependency that requires admin role.
-
-    Raises 403 if the authenticated user is not an admin.
-    """
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail={
-            "error": {"code": "FORBIDDEN", "message": "Admin role required"}
-        })
+    """Alias for require_auth — RBAC is not enforced."""
     return user

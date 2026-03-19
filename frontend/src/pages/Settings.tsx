@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Play, Clock, History, CheckCircle, XCircle, AlertTriangle, Database, Server, Shield, Activity, Globe, Bell, Eye, EyeOff, X, Send, Power, ChevronDown, ChevronUp, Link2, Key, Hash, Info } from 'lucide-react';
 import api from '../lib/api';
 import type { HealthCheck, PaginatedResponse } from '../lib/api';
-import { formatDate, statusColor, cn } from '../lib/utils';
+import { formatDate, formatDuration, statusColor, cn } from '../lib/utils';
 import ScanDetailModal from '../components/ScanDetailModal';
 
 // ==================== Types ====================
@@ -134,7 +134,7 @@ export default function SettingsPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500 mt-1">Manage configuration, schedules, and notifications</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage configuration, schedules, and notifications</p>
       </div>
 
       {/* Tab Buttons */}
@@ -147,7 +147,7 @@ export default function SettingsPage() {
               'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
               activeTab === tab.id
                 ? 'border-blue-600 text-blue-700 dark:text-blue-400'
-                : 'border-transparent text-gray-500 dark:text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 hover:border-gray-300'
             )}
           >
             {tab.label}
@@ -189,7 +189,7 @@ function GeneralTab() {
   });
 
   if (tenantLoading) {
-    return <div className="flex items-center justify-center h-40"><div className="text-gray-500 dark:text-gray-400 dark:text-gray-500 text-sm">Loading settings...</div></div>;
+    return <div className="flex items-center justify-center h-40"><div className="text-gray-500 dark:text-gray-400 text-sm">Loading settings...</div></div>;
   }
 
   if (tenantError) {
@@ -203,19 +203,19 @@ function GeneralTab() {
         <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Okta Configuration</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 mb-1">Organization</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Organization</label>
             <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
               {tenant?.okta_org || '--'}
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 mb-1">Org Type</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Org Type</label>
             <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
               {tenant?.okta_org_type || '--'}
             </div>
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 mb-1">API Token</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">API Token</label>
             <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 font-mono">
               {tenant?.okta_api_token_masked || (tenant?.okta_api_token_set ? '****' : 'Not configured')}
             </div>
@@ -334,7 +334,7 @@ function DangerZone() {
         </div>
         <div className="flex-1">
           <h2 className="text-sm font-semibold text-red-700 dark:text-red-400">Danger Zone</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 dark:text-gray-500 mt-1">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Reset the entire application to a clean state. This permanently deletes <strong>all</strong> scan
             results, vulnerabilities, posture findings, scheduled jobs, reports, notifications, and audit logs.
             Default scenarios will be re-created.
@@ -589,16 +589,8 @@ function SchedulesTab() {
     return job.schedule_type;
   }
 
-  function formatDuration(seconds: number | null): string {
-    if (seconds === null) return '--';
-    if (seconds < 60) return `${Math.round(seconds)}s`;
-    const m = Math.floor(seconds / 60);
-    const s = Math.round(seconds % 60);
-    return `${m}m ${s}s`;
-  }
-
   if (isLoading) {
-    return <div className="flex items-center justify-center h-40"><div className="text-gray-500 dark:text-gray-400 dark:text-gray-500">Loading schedules...</div></div>;
+    return <div className="flex items-center justify-center h-40"><div className="text-gray-500 dark:text-gray-400">Loading schedules...</div></div>;
   }
 
   if (error) {
@@ -608,7 +600,7 @@ function SchedulesTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">Manage automated scan schedules</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Manage automated scan schedules</p>
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
@@ -773,19 +765,19 @@ function SchedulesTab() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 dark:bg-gray-800/50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Type</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Schedule</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Active</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Last Run</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Next Run</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Schedule</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Active</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Run</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Next Run</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
             {jobs && jobs.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400 dark:text-gray-500">
+                <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                   No scheduled jobs. Create one to automate scans.
                 </td>
               </tr>
@@ -794,7 +786,7 @@ function SchedulesTab() {
               <tr key={job.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800/50">
                 <td className="px-6 py-4">
                   <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{job.name}</div>
-                  {job.description && <div className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500 mt-0.5">{job.description}</div>}
+                  {job.description && <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{job.description}</div>}
                   <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                     {job.scan_config?.user_selection === 'specific' && job.scan_config?.specific_users?.length
                       ? `${job.scan_config.specific_users.length} specific user${job.scan_config.specific_users.length > 1 ? 's' : ''}`
@@ -808,14 +800,14 @@ function SchedulesTab() {
                     {job.schedule_type}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 dark:text-gray-500 font-mono">{formatSchedule(job)}</td>
+                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-mono">{formatSchedule(job)}</td>
                 <td className="px-6 py-4">
                   {job.is_active
                     ? <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">Active</span>
-                    : <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 dark:text-gray-400 dark:text-gray-500">Inactive</span>}
+                    : <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 dark:text-gray-400">Inactive</span>}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">{formatDate(job.last_run_at)}</td>
-                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">{formatDate(job.next_run_at)}</td>
+                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(job.last_run_at)}</td>
+                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(job.next_run_at)}</td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-1">
                     <button
@@ -843,7 +835,7 @@ function SchedulesTab() {
                         </button>
                         <button
                           onClick={() => setDeleteConfirm(null)}
-                          className="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                          className="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
                         >
                           Cancel
                         </button>
@@ -874,17 +866,17 @@ function SchedulesTab() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 dark:bg-gray-800/50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Job Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Users</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Duration</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Started At</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Job Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Users</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Started At</th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
             {(!historyData?.items || historyData.items.length === 0) && (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400 dark:text-gray-500">
+                <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                   No execution history yet.
                 </td>
               </tr>

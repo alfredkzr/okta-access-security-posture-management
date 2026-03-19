@@ -10,10 +10,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.audit import log_audit
-from src.api.dependencies import get_db, get_okta_client, require_auth, require_auth
+from src.api.dependencies import get_db, require_admin, require_auth
 from src.api.errors import AppError
 from src.config import settings
-from src.core.okta_client import OktaClient
 from src.db import async_session
 from src.models.assessment_result import AssessmentResult
 from src.models.posture_finding import PostureFinding
@@ -25,6 +24,7 @@ from src.schemas.assessments import (
     ScanSummaryResponse,
     SingleAssessmentRequest,
 )
+from src.core.okta_client import OktaClient
 from src.schemas.common import PaginatedResponse
 from src.schemas.posture import PostureFindingResponse
 
@@ -82,7 +82,6 @@ async def _run_single_scan_background(scan_id: uuid.UUID, email: str):
 
         # Fire notification (fire-and-forget, separate session)
         try:
-            import asyncio as _asyncio
             from src.core.notifier import dispatch as notify
 
             async def _notify_scan_done():
@@ -97,7 +96,7 @@ async def _run_single_scan_background(scan_id: uuid.UUID, email: str):
                 except Exception:
                     pass
 
-            _asyncio.create_task(_notify_scan_done())
+            asyncio.create_task(_notify_scan_done())
         except Exception:
             pass  # Notifications are best-effort
 
@@ -124,7 +123,7 @@ async def run_single_assessment(
     body: SingleAssessmentRequest,
     background_tasks: BackgroundTasks,
     request: Request,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     # Create and commit the scan record before starting background work
@@ -157,7 +156,7 @@ async def run_single_assessment(
 @router.post("/batch", response_model=ScanSummaryResponse, status_code=201)
 async def run_batch_assessment(
     body: BatchAssessmentRequest,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     scan = Scan(
@@ -190,7 +189,6 @@ async def run_batch_assessment(
                     "include_posture_checks": body.include_posture_checks,
                     "max_workers": body.max_workers,
                     "api_delay": body.api_delay,
-                    "generate_ai_summary": body.generate_ai_summary,
                 },
                 timeout=0,
                 heartbeat=600,

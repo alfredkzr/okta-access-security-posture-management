@@ -16,7 +16,6 @@ class ReportType(str, enum.Enum):
     CSV_POSTURE = "csv_posture"
     PDF = "pdf"
     JSON = "json"
-    AI_SUMMARY = "ai_summary"
 
 
 class Report(Base):
@@ -37,7 +36,7 @@ class Report(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    scan = relationship("Scan", lazy="selectin")
+    scan = relationship("Scan", lazy="select")
 
     __table_args__ = (
         Index("ix_reports_scan_id", "scan_id"),

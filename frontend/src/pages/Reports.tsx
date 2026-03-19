@@ -2,17 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FileText, Download, FileSpreadsheet, FileJson, Loader2 } from 'lucide-react';
 import api from '../lib/api';
-import type { PaginatedResponse, Scan } from '../lib/api';
+import type { PaginatedResponse, Report, Scan } from '../lib/api';
 import { formatDate } from '../lib/utils';
-
-interface Report {
-  id: string;
-  scan_id: string;
-  report_type: string;
-  file_path: string | null;
-  generated_at: string;
-  created_at: string;
-}
 
 const REPORT_TYPES = [
   { value: 'csv_full', label: 'CSV Export', icon: FileSpreadsheet, description: 'All assessment results for every user and app' },
@@ -35,7 +26,11 @@ export default function Reports() {
   const { data: reports, isLoading } = useQuery<Report[]>({
     queryKey: ['reports'],
     queryFn: () => api.get('/reports').then(r => r.data),
-    refetchInterval: 5000,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      // Only poll when there are reports still generating (no file_path yet)
+      return data?.some(r => !r.file_path && !r.generated_at) ? 5000 : false;
+    },
   });
 
   const { data: scansData } = useQuery<PaginatedResponse<Scan>>({

@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.audit import log_audit
-from src.api.dependencies import get_db, require_auth, require_auth
+from src.api.dependencies import get_db, require_admin, require_auth
 from src.api.errors import AppError
 from src.config import settings
 from src.db import async_session
@@ -54,11 +54,6 @@ async def _generate_report_background(report_id: uuid.UUID, scan_id: uuid.UUID, 
                     await generate_pdf(scan_id, db, output_path)
                     report.file_path = output_path
 
-                elif report_type == "ai_summary":
-                    from src.reports.ai_summary_builder import generate_ai_summary
-                    content = await generate_ai_summary(scan_id, db)
-                    report.content = content
-
                 else:
                     report.content = f"Unsupported report type: {report_type}"
 
@@ -81,7 +76,7 @@ async def generate_report(
     body: ReportGenerateRequest,
     background_tasks: BackgroundTasks,
     http_request: Request,
-    current_user: dict = Depends(require_auth),
+    current_user: dict = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     scan = await db.get(Scan, body.scan_id)
@@ -144,7 +139,11 @@ async def download_report(
         return {"content": report.content, "report_type": report.report_type}
 
     if report.file_path:
-        path = Path(report.file_path)
+        reports_base = Path(settings.reports_dir).resolve()
+        path = Path(report.file_path).resolve()
+        # Prevent path traversal — file must be within the reports directory
+        if not path.is_relative_to(reports_base):
+            raise AppError("FORBIDDEN", "Invalid report path", status=403)
         if not path.exists():
             raise AppError("NOT_FOUND", "Report file not found on disk", status=404)
         media_type = {

@@ -1,4 +1,4 @@
-"""SAQ task: generate reports (CSV, PDF, JSON, AI summary)."""
+"""SAQ task: generate reports (CSV, PDF, JSON)."""
 
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ _EXTENSIONS = {
     "csv_posture": "csv",
     "pdf": "pdf",
     "json": "json",
-    "ai_summary": "txt",
 }
 
 
@@ -33,10 +32,10 @@ async def generate_report_task(ctx: dict, *, scan_id: str, report_type: str) -> 
         ctx: SAQ context dict (contains db_session_factory).
         scan_id: UUID string of the Scan record.
         report_type: One of csv_full, csv_violations, csv_inactive, csv_posture,
-                     pdf, json, ai_summary.
+                     pdf, json.
 
     Returns:
-        Dict with report_id and file_path or content indicator.
+        Dict with report_id and file_path.
     """
     scan_uuid = uuid.UUID(scan_id)
     session_factory = ctx["db_session_factory"]
@@ -51,16 +50,11 @@ async def generate_report_task(ctx: dict, *, scan_id: str, report_type: str) -> 
                 report_type=ReportType(report_type),
             )
 
-            if report_type == "ai_summary":
-                content = await _generate_ai_summary(scan_uuid, db_session)
-                report_record.content = content
-                report_record.file_path = None
-            else:
-                file_path = await _generate_file_report(
-                    scan_uuid, db_session, report_type
-                )
-                report_record.file_path = file_path
-                report_record.content = None
+            file_path = await _generate_file_report(
+                scan_uuid, db_session, report_type
+            )
+            report_record.file_path = file_path
+            report_record.content = None
 
             db_session.add(report_record)
             await db_session.commit()
@@ -76,7 +70,6 @@ async def generate_report_task(ctx: dict, *, scan_id: str, report_type: str) -> 
                 "report_id": str(report_record.id),
                 "report_type": report_type,
                 "file_path": report_record.file_path,
-                "has_content": report_record.content is not None,
             }
 
         except Exception as exc:
@@ -116,16 +109,6 @@ async def _generate_file_report(
         await generate_json(scan_id, db_session, output_path)
 
     else:
-        raise ValueError(f"Unsupported file report type: {report_type}")
+        raise ValueError(f"Unsupported report type: {report_type}")
 
     return output_path
-
-
-async def _generate_ai_summary(
-    scan_id: uuid.UUID,
-    db_session: AsyncSession,
-) -> str:
-    """Generate AI summary and return the text content."""
-    from src.reports.ai_summary_builder import generate_ai_summary
-
-    return await generate_ai_summary(scan_id, db_session)

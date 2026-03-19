@@ -7,6 +7,7 @@ from sqlalchemy import Date, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_db, require_auth
+from src.core.constants import SEVERITY_WEIGHTS
 from src.models.assessment_result import AssessmentResult
 from src.models.posture_finding import FindingSeverity, FindingStatus, PostureFinding
 from src.models.scan import Scan, ScanStatus
@@ -15,44 +16,37 @@ from src.schemas.dashboard import DashboardSummaryResponse, DashboardTrendsRespo
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 
-_SEVERITY_WEIGHTS = {
-    FindingSeverity.CRITICAL: 15,
-    FindingSeverity.HIGH: 10,
-    FindingSeverity.MEDIUM: 5,
-    FindingSeverity.LOW: 2,
-}
-
 
 @router.get("/summary", response_model=DashboardSummaryResponse)
 async def get_dashboard_summary(
     current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
-    # Vulnerability counts by status
-    status_stmt = select(
-        Vulnerability.status, func.count(Vulnerability.id)
-    ).group_by(Vulnerability.status)
-    status_result = await db.execute(status_stmt)
-    status_counts = {str(row[0].value): row[1] for row in status_result.all()}
+    # Combined vulnerability aggregation: status, severity, category in one query
+    vuln_agg_stmt = select(
+        Vulnerability.status,
+        Vulnerability.severity,
+        Vulnerability.category,
+        func.count(Vulnerability.id).label("cnt"),
+    ).group_by(Vulnerability.status, Vulnerability.severity, Vulnerability.category)
+    vuln_agg_result = await db.execute(vuln_agg_stmt)
+
+    status_counts: dict[str, int] = {}
+    by_severity: dict[str, int] = {}
+    by_category: dict[str, int] = {}
+    for row in vuln_agg_result.all():
+        s_val = str(row[0].value)
+        sev_val = str(row[1].value)
+        cat_val = str(row[2].value)
+        cnt = row[3]
+        status_counts[s_val] = status_counts.get(s_val, 0) + cnt
+        by_severity[sev_val] = by_severity.get(sev_val, 0) + cnt
+        by_category[cat_val] = by_category.get(cat_val, 0) + cnt
 
     total_vulns = sum(status_counts.values())
     active = status_counts.get("ACTIVE", 0)
     closed = status_counts.get("CLOSED", 0)
     acknowledged = status_counts.get("ACKNOWLEDGED", 0)
-
-    # By severity
-    sev_stmt = select(
-        Vulnerability.severity, func.count(Vulnerability.id)
-    ).group_by(Vulnerability.severity)
-    sev_result = await db.execute(sev_stmt)
-    by_severity = {str(row[0].value): row[1] for row in sev_result.all()}
-
-    # By category
-    cat_stmt = select(
-        Vulnerability.category, func.count(Vulnerability.id)
-    ).group_by(Vulnerability.category)
-    cat_result = await db.execute(cat_stmt)
-    by_category = {str(row[0].value): row[1] for row in cat_result.all()}
 
     # Posture findings count + score
     posture_stmt = select(
@@ -61,7 +55,7 @@ async def get_dashboard_summary(
     posture_result = await db.execute(posture_stmt)
     deduction = 0
     for row in posture_result.all():
-        deduction += _SEVERITY_WEIGHTS.get(row[0], 0) * row[1]
+        deduction += SEVERITY_WEIGHTS.get(row[0], 0) * row[1]
     posture_score = max(0, 100 - deduction)
 
     total_posture = (await db.execute(select(func.count(PostureFinding.id)))).scalar() or 0

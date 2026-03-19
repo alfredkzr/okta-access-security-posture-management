@@ -13,6 +13,7 @@ from typing import Any
 
 import structlog
 
+from src.core.constants import PHISHING_RESISTANT_FACTORS, STRONG_FACTOR_TYPES, WEAK_FACTOR_TYPES
 from src.core.risk_scorer import RiskInput, calculate_risk_score
 from src.models.posture_finding import (
     CheckCategory,
@@ -22,15 +23,6 @@ from src.models.posture_finding import (
 )
 
 logger = structlog.get_logger(__name__)
-
-# Factor types considered weak (easily phished or intercepted)
-WEAK_FACTOR_TYPES = {"sms", "call", "question"}
-
-# Factor types considered phishing-resistant
-PHISHING_RESISTANT_FACTORS = {"webauthn", "signed_nonce"}
-
-# Factor types considered strong (not phishing-resistant but better than weak)
-STRONG_FACTOR_TYPES = {"token:software:totp", "push", "token:hotp", "token", "totp"}
 
 # Minimum phishing-resistant coverage percentage before flagging
 PHISHING_RESISTANT_COVERAGE_THRESHOLD = 50
