@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies import get_db
+from src.api.dependencies import get_db, require_auth, require_auth
 from src.api.errors import AppError
 from src.models.posture_finding import FindingSeverity, FindingStatus, PostureFinding
 from src.schemas.common import PaginatedResponse
@@ -32,6 +32,7 @@ async def list_findings(
     scan_id: uuid.UUID | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(PostureFinding)
@@ -68,6 +69,7 @@ async def list_findings(
 
 @router.get("/score", response_model=PostureScoreResponse)
 async def get_posture_score(
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     # Only count OPEN findings for the score
@@ -105,6 +107,7 @@ async def get_posture_score(
 @router.get("/findings/{finding_id}", response_model=PostureFindingResponse)
 async def get_finding(
     finding_id: uuid.UUID,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -120,6 +123,7 @@ async def get_finding(
 async def update_finding_status(
     finding_id: uuid.UUID,
     body: PostureFindingUpdate,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     valid_statuses = {"OPEN", "RESOLVED", "ACKNOWLEDGED", "FALSE_POSITIVE"}

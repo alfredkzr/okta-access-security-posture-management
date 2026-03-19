@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Shield, AlertTriangle, CheckCircle, Eye } from 'lucide-react';
+import { Shield, AlertTriangle, Eye, XCircle } from 'lucide-react';
 import api from '../lib/api';
 import type { PaginatedResponse, Vulnerability, VulnerabilityStats } from '../lib/api';
 import { severityColor, statusColor, riskScoreColor, formatDate, cn } from '../lib/utils';
@@ -44,7 +44,7 @@ export default function Vulnerabilities() {
   const statCards = [
     { label: 'Total', value: stats?.total ?? 0, icon: Shield, color: 'text-gray-700 dark:text-gray-300', bg: 'bg-gray-50 dark:bg-gray-800' },
     { label: 'Active', value: stats?.active ?? 0, icon: AlertTriangle, color: 'text-red-700', bg: 'bg-red-50 dark:bg-red-900/20' },
-    { label: 'Remediated', value: stats?.remediated ?? 0, icon: CheckCircle, color: 'text-green-700', bg: 'bg-green-50 dark:bg-green-900/20' },
+    { label: 'Closed', value: stats?.closed ?? 0, icon: XCircle, color: 'text-gray-700', bg: 'bg-gray-50 dark:bg-gray-800' },
     { label: 'Acknowledged', value: stats?.acknowledged ?? 0, icon: Eye, color: 'text-blue-700', bg: 'bg-blue-50 dark:bg-blue-900/20' },
   ];
 
@@ -82,7 +82,7 @@ export default function Vulnerabilities() {
         >
           <option value="">All Statuses</option>
           <option value="ACTIVE">Active</option>
-          <option value="REMEDIATED">Remediated</option>
+          <option value="CLOSED">Closed</option>
           <option value="ACKNOWLEDGED">Acknowledged</option>
         </select>
         <select

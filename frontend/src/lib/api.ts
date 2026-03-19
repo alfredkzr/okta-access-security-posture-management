@@ -36,6 +36,7 @@ export interface Vulnerability {
   first_detected: string;
   last_detected: string;
   remediated_at: string | null;
+  acknowledged_by: string | null;
 }
 
 export interface VulnerabilityImpact {
@@ -55,7 +56,7 @@ export interface VulnerabilityDetail extends Vulnerability {
 export interface VulnerabilityStats {
   total: number;
   active: number;
-  remediated: number;
+  closed: number;
   acknowledged: number;
   by_severity: Record<string, number>;
   by_category: Record<string, number>;
@@ -110,10 +111,13 @@ export interface Scenario {
   name: string;
   description: string | null;
   is_active: boolean;
-  risk_level: string;
+  risk_level: string | null;
   device_platform: string;
   device_registered: boolean;
   device_managed: boolean | null;
+  device_assurance_id: string | null;
+  ip_address: string | null;
+  zone_ids: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -121,7 +125,7 @@ export interface Scenario {
 export interface DashboardSummary {
   total_vulnerabilities: number;
   active_vulnerabilities: number;
-  remediated_vulnerabilities: number;
+  closed_vulnerabilities: number;
   acknowledged_vulnerabilities: number;
   by_severity: Record<string, number>;
   by_category: Record<string, number>;

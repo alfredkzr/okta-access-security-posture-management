@@ -2,7 +2,19 @@
 
 from __future__ import annotations
 
+import os
 import uuid
+
+# Set required env vars before any src imports trigger Settings() validation
+os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production-use")
+os.environ.setdefault("ENCRYPTION_KEY", "dGVzdC1lbmNyeXB0aW9uLWtleS0xMjM0NTY3ODk=")  # noqa: E501
+
+# Generate a valid Fernet key for tests if the default isn't valid
+from cryptography.fernet import Fernet as _Fernet
+try:
+    _Fernet(os.environ["ENCRYPTION_KEY"].encode())
+except Exception:
+    os.environ["ENCRYPTION_KEY"] = _Fernet.generate_key().decode()
 
 import pytest
 import pytest_asyncio

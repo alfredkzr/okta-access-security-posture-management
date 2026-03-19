@@ -8,7 +8,7 @@ from sqlalchemy import delete, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.audit import log_audit
-from src.api.dependencies import get_db
+from src.api.dependencies import get_db, require_auth, require_auth
 from src.api.errors import AppError
 from src.models.scenario import Scenario
 from src.schemas.scenarios import ScenarioCreate, ScenarioResponse, ScenarioUpdate
@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/v1/scenarios", tags=["scenarios"])
 @router.get("", response_model=list[ScenarioResponse])
 async def list_scenarios(
     is_active: bool | None = None,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Scenario).order_by(Scenario.created_at.desc())
@@ -34,6 +35,7 @@ async def list_scenarios(
 async def create_scenario(
     body: ScenarioCreate,
     request: Request,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     scenario = Scenario(**body.model_dump())
@@ -41,7 +43,7 @@ async def create_scenario(
     await db.flush()
     await db.refresh(scenario)
 
-    actor = request.headers.get("X-Actor-Email", "system")
+    actor = current_user.get("email", "unknown")
     ip = request.client.host if request.client else "unknown"
     await log_audit(
         db, actor, "scenario_created", "scenario", str(scenario.id),
@@ -57,6 +59,7 @@ async def update_scenario(
     scenario_id: uuid.UUID,
     body: ScenarioUpdate,
     request: Request,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Scenario).where(Scenario.id == scenario_id))
@@ -95,7 +98,7 @@ async def update_scenario(
             vulnerabilities_updated=updated_count,
         )
 
-    actor = request.headers.get("X-Actor-Email", "system")
+    actor = current_user.get("email", "unknown")
     ip = request.client.host if request.client else "unknown"
     await log_audit(
         db, actor, "scenario_updated", "scenario", str(scenario_id),
@@ -110,6 +113,7 @@ async def update_scenario(
 async def delete_scenario(
     scenario_id: uuid.UUID,
     request: Request,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Scenario).where(Scenario.id == scenario_id))
@@ -121,7 +125,7 @@ async def delete_scenario(
     await db.delete(scenario)
     await db.flush()
 
-    actor = request.headers.get("X-Actor-Email", "system")
+    actor = current_user.get("email", "unknown")
     ip = request.client.host if request.client else "unknown"
     await log_audit(
         db, actor, "scenario_deleted", "scenario", str(scenario_id),
@@ -133,6 +137,7 @@ async def delete_scenario(
 @router.post("/import", response_model=list[ScenarioResponse], status_code=201)
 async def import_scenarios(
     scenarios: list[ScenarioCreate],
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     created = []
@@ -148,6 +153,7 @@ async def import_scenarios(
 
 @router.get("/export", response_model=list[ScenarioResponse])
 async def export_scenarios(
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Scenario).order_by(Scenario.created_at))

@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.audit import log_audit
-from src.api.dependencies import get_db
+from src.api.dependencies import get_db, require_auth, require_auth
 from src.api.errors import AppError
 from src.config import settings
 from src.db import async_session
@@ -81,6 +81,7 @@ async def generate_report(
     body: ReportGenerateRequest,
     background_tasks: BackgroundTasks,
     http_request: Request,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     scan = await db.get(Scan, body.scan_id)
@@ -90,13 +91,12 @@ async def generate_report(
     report = Report(
         scan_id=body.scan_id,
         report_type=body.report_type,
-        generated_at=datetime.now(timezone.utc),
     )
     db.add(report)
     await db.flush()
     await db.refresh(report)
 
-    actor = http_request.headers.get("X-Actor-Email", "system")
+    actor = current_user.get("email", "unknown")
     ip = http_request.client.host if http_request.client else "unknown"
     await log_audit(
         db, actor, "report_generated", "report", str(report.id),
@@ -119,6 +119,7 @@ async def list_reports(
     scan_id: uuid.UUID | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     query = select(Report).order_by(Report.created_at.desc())
@@ -132,6 +133,7 @@ async def list_reports(
 @router.get("/{report_id}/download")
 async def download_report(
     report_id: uuid.UUID,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     report = await db.get(Report, report_id)

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.api.audit import log_audit
-from src.api.dependencies import get_db
+from src.api.dependencies import get_db, require_auth, require_auth
 from src.api.errors import AppError
 from src.core import vulnerability_engine
 from src.models.vulnerability import Severity, Vulnerability, VulnerabilityCategory, VulnerabilityStatus
@@ -28,6 +28,7 @@ router = APIRouter(prefix="/api/v1/vulnerabilities", tags=["vulnerabilities"])
 
 @router.get("/stats", response_model=VulnerabilityStatsResponse)
 async def get_vulnerability_stats(
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     # Reconcile before computing stats
@@ -59,7 +60,7 @@ async def get_vulnerability_stats(
     return VulnerabilityStatsResponse(
         total=total,
         active=status_counts.get("ACTIVE", 0),
-        remediated=status_counts.get("REMEDIATED", 0),
+        closed=status_counts.get("CLOSED", 0),
         acknowledged=status_counts.get("ACKNOWLEDGED", 0),
         by_severity=by_severity,
         by_category=by_category,
@@ -73,8 +74,10 @@ async def list_vulnerabilities(
     category: str | None = None,
     risk_score_min: int | None = None,
     risk_score_max: int | None = None,
+    sort: str | None = Query(None, description="Sort field: risk_score, severity, last_detected (default). Prefix with - for desc."),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(Vulnerability)
@@ -102,8 +105,22 @@ async def list_vulnerabilities(
 
     total = (await db.execute(count_stmt)).scalar() or 0
 
+    # Sorting
+    sort_columns = {
+        "risk_score": Vulnerability.risk_score,
+        "severity": Vulnerability.severity,
+        "last_detected": Vulnerability.last_detected,
+    }
+    if sort:
+        desc = sort.startswith("-")
+        field = sort.lstrip("-")
+        col = sort_columns.get(field, Vulnerability.last_detected)
+        stmt = stmt.order_by(col.desc() if desc else col.asc())
+    else:
+        stmt = stmt.order_by(Vulnerability.last_detected.desc())
+
     offset = (page - 1) * page_size
-    stmt = stmt.order_by(Vulnerability.last_detected.desc()).offset(offset).limit(page_size)
+    stmt = stmt.offset(offset).limit(page_size)
     result = await db.execute(stmt)
     items = [VulnerabilityResponse.model_validate(v) for v in result.scalars().all()]
 
@@ -119,17 +136,18 @@ async def list_vulnerabilities(
 @router.post("/reconcile")
 async def reconcile_vulnerability_statuses(
     request: Request,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Reconcile all vulnerability statuses based on actual active impact counts.
 
-    Marks ACTIVE vulnerabilities with zero active impacts as REMEDIATED,
-    and REMEDIATED vulnerabilities with active impacts as ACTIVE.
+    Marks ACTIVE vulnerabilities with zero active impacts as CLOSED,
+    and CLOSED vulnerabilities with active impacts as ACTIVE.
     """
     result = await vulnerability_engine.reconcile_all_vulnerability_statuses(db)
     await db.commit()
 
-    actor = request.headers.get("X-Actor-Email", "system")
+    actor = current_user.get("email", "unknown")
     ip = request.client.host if request.client else "unknown"
     await log_audit(
         db, actor, "vulnerability_status_changed", "vulnerability", "all",
@@ -144,6 +162,7 @@ async def reconcile_vulnerability_statuses(
 @router.get("/{vuln_id}", response_model=VulnerabilityDetailResponse)
 async def get_vulnerability(
     vuln_id: uuid.UUID,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = (
@@ -157,7 +176,7 @@ async def get_vulnerability(
         raise AppError(code="NOT_FOUND", message="Vulnerability not found", status=404)
 
     # Auto-reconcile: if all impacts are RESOLVED but vuln is still ACTIVE,
-    # mark it REMEDIATED on the spot so the UI always reflects reality.
+    # mark it CLOSED on the spot so the UI always reflects reality.
     await _auto_reconcile(db, vuln)
 
     return vuln
@@ -168,9 +187,10 @@ async def update_vulnerability_status(
     vuln_id: uuid.UUID,
     body: VulnerabilityUpdateRequest,
     request: Request,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
-    valid_statuses = {"ACTIVE", "REMEDIATED", "ACKNOWLEDGED"}
+    valid_statuses = {"ACTIVE", "CLOSED", "ACKNOWLEDGED"}
     if body.status not in valid_statuses:
         raise AppError(
             code="INVALID_STATUS",
@@ -184,13 +204,15 @@ async def update_vulnerability_status(
         raise AppError(code="NOT_FOUND", message="Vulnerability not found", status=404)
 
     old_status = vuln.status.value if hasattr(vuln.status, "value") else str(vuln.status)
+    actor = current_user.get("email", "unknown")
     vuln.status = body.status
-    if body.status == "REMEDIATED":
+    if body.status == "CLOSED":
         vuln.remediated_at = datetime.now(timezone.utc)
     elif body.status == "ACTIVE":
         vuln.remediated_at = None
-
-    actor = request.headers.get("X-Actor-Email", "system")
+        vuln.acknowledged_by = None
+    if body.status == "ACKNOWLEDGED":
+        vuln.acknowledged_by = actor
     ip = request.client.host if request.client else "unknown"
     await log_audit(
         db, actor, "vulnerability_status_changed", "vulnerability", str(vuln_id),
@@ -211,8 +233,8 @@ async def update_vulnerability_status(
 async def _auto_reconcile(db: AsyncSession, vuln: Vulnerability) -> None:
     """Reconcile a single vulnerability's status against its actual impacts.
 
-    If all impacts are RESOLVED and the vuln is ACTIVE → set REMEDIATED.
-    If any impact is ACTIVE and the vuln is REMEDIATED → set ACTIVE.
+    If all impacts are RESOLVED and the vuln is ACTIVE → set CLOSED.
+    If any impact is ACTIVE and the vuln is CLOSED → set ACTIVE.
     """
     if vuln.status == VulnerabilityStatus.ACKNOWLEDGED:
         return  # User-acknowledged — don't auto-change
@@ -228,10 +250,10 @@ async def _auto_reconcile(db: AsyncSession, vuln: Vulnerability) -> None:
     vuln.active_impact_count = active_count
 
     if active_count == 0 and vuln.status == VulnerabilityStatus.ACTIVE:
-        vuln.status = VulnerabilityStatus.REMEDIATED
+        vuln.status = VulnerabilityStatus.CLOSED
         vuln.remediated_at = datetime.now(timezone.utc)
         await db.flush()
-    elif active_count > 0 and vuln.status == VulnerabilityStatus.REMEDIATED:
+    elif active_count > 0 and vuln.status == VulnerabilityStatus.CLOSED:
         vuln.status = VulnerabilityStatus.ACTIVE
         vuln.remediated_at = None
         await db.flush()
@@ -239,7 +261,6 @@ async def _auto_reconcile(db: AsyncSession, vuln: Vulnerability) -> None:
 
 async def _auto_reconcile_all(db: AsyncSession) -> None:
     """Reconcile all ACTIVE vulnerabilities that have zero active impacts."""
-    # Find ACTIVE vulns with no ACTIVE impacts via a LEFT JOIN + HAVING
     from sqlalchemy import literal_column
 
     subq = (
@@ -272,7 +293,7 @@ async def _auto_reconcile_all(db: AsyncSession) -> None:
 
     now = datetime.now(timezone.utc)
     for vuln in stale_vulns:
-        vuln.status = VulnerabilityStatus.REMEDIATED
+        vuln.status = VulnerabilityStatus.CLOSED
         vuln.remediated_at = now
         vuln.active_impact_count = 0
 

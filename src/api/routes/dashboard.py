@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import Date, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies import get_db
+from src.api.dependencies import get_db, require_auth
 from src.models.assessment_result import AssessmentResult
 from src.models.posture_finding import FindingSeverity, FindingStatus, PostureFinding
 from src.models.scan import Scan, ScanStatus
@@ -25,6 +25,7 @@ _SEVERITY_WEIGHTS = {
 
 @router.get("/summary", response_model=DashboardSummaryResponse)
 async def get_dashboard_summary(
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     # Vulnerability counts by status
@@ -36,7 +37,7 @@ async def get_dashboard_summary(
 
     total_vulns = sum(status_counts.values())
     active = status_counts.get("ACTIVE", 0)
-    remediated = status_counts.get("REMEDIATED", 0)
+    closed = status_counts.get("CLOSED", 0)
     acknowledged = status_counts.get("ACKNOWLEDGED", 0)
 
     # By severity
@@ -109,7 +110,7 @@ async def get_dashboard_summary(
     return DashboardSummaryResponse(
         total_vulnerabilities=total_vulns,
         active_vulnerabilities=active,
-        remediated_vulnerabilities=remediated,
+        closed_vulnerabilities=closed,
         acknowledged_vulnerabilities=acknowledged,
         by_severity=by_severity,
         by_category=by_category,
@@ -126,6 +127,7 @@ async def get_dashboard_summary(
 @router.get("/trends", response_model=DashboardTrendsResponse)
 async def get_dashboard_trends(
     days: int = Query(30, ge=1, le=365),
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     since = datetime.now(timezone.utc) - timedelta(days=days)

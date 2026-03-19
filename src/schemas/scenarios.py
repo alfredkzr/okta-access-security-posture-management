@@ -14,7 +14,7 @@ class ScenarioCreate(BaseModel):
     name: str
     description: str = ""
     is_active: bool = True
-    risk_level: OktaRiskLevel  # Okta risk signal: LOW, MEDIUM, HIGH
+    risk_level: OktaRiskLevel | None = None  # Okta risk signal: LOW, MEDIUM, HIGH (optional)
     device_platform: str  # WINDOWS, MACOS, etc.
     device_registered: bool = False
     device_managed: bool = False
@@ -41,7 +41,7 @@ class ScenarioResponse(BaseModel):
     name: str
     description: str | None = None
     is_active: bool
-    risk_level: str
+    risk_level: str | None = None
     device_platform: str
     device_registered: bool
     device_managed: bool | None = None

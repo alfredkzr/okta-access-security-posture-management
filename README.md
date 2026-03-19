@@ -4,6 +4,8 @@
 
 A security platform that tests whether your Okta tenant's authentication policies actually enforce access controls under risky conditions. It simulates access attempts via the Okta Policy Simulation API and flags policies that ALLOW access when they should DENY.
 
+This solution was originally presented at [Oktane 2025 — Showcase: Build Your Own Security Tools Using Okta and Auth0 APIs](https://www.okta.com/oktane/on-demand/2025/showcase-build-your-own-security-tools-using-okta-and-auth0-apis/). It has since been rebuilt from the ground up and made open source for Okta administrators to use.
+
 ## Quick Start
 
 ### Prerequisites
@@ -137,6 +139,23 @@ curl -X POST http://localhost:8000/api/v1/reports \
 
 # Available report types: csv_full, csv_violations, csv_inactive, csv_posture, pdf, json, ai_summary
 ```
+
+## Risk Scoring
+
+Every vulnerability and posture finding receives a composite risk score from 0 to 100, calculated from six weighted factors:
+
+| Factor | Max Points | Description |
+|--------|-----------|-------------|
+| **Severity** | 30 | Base weight from finding severity (CRITICAL=30, HIGH=25, MEDIUM=15, LOW=5) |
+| **Scenario risk** | 15 | Risk level of the simulation scenario that triggered the finding (HIGH=12, MEDIUM=8, LOW=4) |
+| **App criticality** | 15 | User-assigned criticality of the affected application (critical=15, high=12, medium=8, low=4) |
+| **User privilege** | 15 | Whether the finding affects admin users (+10) or service accounts (+5) |
+| **Exposure breadth** | 15 | Number of distinct users affected: >=100 users=15, >=50=12, >=10=8, >=1=4 |
+| **Auth strength** | 10 | No MFA required=10, MFA but not phishing-resistant=5, phishing-resistant MFA=0 |
+
+Risk scores are recalculated after each scan based on the actual number of affected users. A vulnerability affecting 3 users scores lower than one affecting 150 users, even if the severity is the same.
+
+**Risk bands:** 0-25 Low, 26-50 Medium, 51-75 High, 76-100 Critical.
 
 ## Background Worker
 

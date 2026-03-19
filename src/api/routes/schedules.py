@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.audit import log_audit
-from src.api.dependencies import get_db
+from src.api.dependencies import get_db, require_auth, require_auth
 from src.api.errors import AppError
 from src.config import settings
 from src.models.job import Job
@@ -32,6 +32,7 @@ router = APIRouter(prefix="/api/v1/schedules", tags=["schedules"])
 async def list_execution_history(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     count_stmt = select(func.count(Scan.id)).where(Scan.job_id.isnot(None))
@@ -73,6 +74,7 @@ async def list_execution_history(
 
 @router.get("", response_model=list[ScheduleResponse])
 async def list_schedules(
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Job).order_by(Job.created_at.desc()))
@@ -83,6 +85,7 @@ async def list_schedules(
 async def create_schedule(
     body: ScheduleCreate,
     request: Request,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     # Validate scan_config by constructing it (Pydantic validation)
@@ -102,7 +105,7 @@ async def create_schedule(
     await db.flush()
     await db.refresh(job)
 
-    actor = request.headers.get("X-Actor-Email", "system")
+    actor = current_user.get("email", "unknown")
     ip = request.client.host if request.client else "unknown"
     await log_audit(
         db, actor, "schedule_created", "schedule", str(job.id),
@@ -117,6 +120,7 @@ async def create_schedule(
 async def update_schedule(
     job_id: uuid.UUID,
     body: ScheduleUpdate,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Job).where(Job.id == job_id))
@@ -138,6 +142,7 @@ async def update_schedule(
 @router.delete("/{job_id}", status_code=204)
 async def delete_schedule(
     job_id: uuid.UUID,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Job).where(Job.id == job_id))
@@ -151,6 +156,7 @@ async def delete_schedule(
 @router.post("/{job_id}/run-now", response_model=dict, status_code=201)
 async def run_schedule_now(
     job_id: uuid.UUID,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Job).where(Job.id == job_id))

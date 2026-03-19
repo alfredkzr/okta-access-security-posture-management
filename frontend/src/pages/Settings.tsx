@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, Play, Clock, History, Zap, CheckCircle, XCircle, AlertTriangle, Database, Server, Shield, Activity } from 'lucide-react';
+import { Plus, Pencil, Trash2, Play, Clock, History, CheckCircle, XCircle, AlertTriangle, Database, Server, Shield, Activity, Globe, Bell, Eye, EyeOff, X, Send, Power, ChevronDown, ChevronUp, Link2, Key, Hash, Info } from 'lucide-react';
 import api from '../lib/api';
 import type { HealthCheck, PaginatedResponse } from '../lib/api';
 import { formatDate, statusColor, cn } from '../lib/utils';
@@ -73,7 +73,8 @@ interface NotificationChannel {
   webhook_url: string;
   events: string[];
   is_active: boolean;
-  hmac_secret: string | null;
+  has_secret: boolean;
+  custom_headers: Record<string, string> | null;
   created_at: string;
   updated_at: string;
 }
@@ -85,15 +86,15 @@ interface ChannelForm {
   events: string[];
   is_active: boolean;
   hmac_secret: string;
+  custom_headers: { key: string; value: string }[];
 }
 
 // ==================== Constants ====================
 
 const EVENT_OPTIONS = [
-  { value: 'scan_completed', label: 'Scan Completed' },
-  { value: 'new_vulnerabilities', label: 'New Vulnerabilities' },
-  { value: 'posture_critical', label: 'Posture Critical' },
-  { value: 'token_health', label: 'Token Health' },
+  { value: 'scan_completed', label: 'Scan Completed', description: 'Fired when a scan finishes (success, failure, or partial)', severity: 'info' },
+  { value: 'new_vulnerabilities', label: 'New Vulnerabilities', description: 'HIGH or CRITICAL vulnerabilities discovered during scan', severity: 'high' },
+  { value: 'token_health', label: 'Token Health', description: 'Okta API token invalid, expiring, or rate limit critically low', severity: 'warning' },
 ];
 
 const emptyScheduleForm: ScheduleForm = {
@@ -113,6 +114,7 @@ const emptyChannelForm: ChannelForm = {
   events: [],
   is_active: true,
   hmac_secret: '',
+  custom_headers: [],
 };
 
 type TabId = 'general' | 'schedules' | 'notifications';
@@ -931,6 +933,8 @@ function NotificationsTab() {
   const [form, setForm] = useState<ChannelForm>(emptyChannelForm);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, 'success' | 'error' | 'loading'>>({});
+  const [showSecret, setShowSecret] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const { data: channels, isLoading, error } = useQuery<NotificationChannel[]>({
     queryKey: ['notification-channels'],
@@ -939,8 +943,17 @@ function NotificationsTab() {
 
   const createMutation = useMutation({
     mutationFn: (data: ChannelForm) => {
-      const payload: Record<string, unknown> = { ...data };
-      if (!data.hmac_secret) delete payload.hmac_secret;
+      const headersObj: Record<string, string> = {};
+      data.custom_headers.forEach(h => { if (h.key.trim()) headersObj[h.key.trim()] = h.value; });
+      const payload: Record<string, unknown> = {
+        name: data.name,
+        channel_type: data.channel_type,
+        webhook_url: data.webhook_url,
+        events: data.events,
+        is_active: data.is_active,
+        custom_headers: Object.keys(headersObj).length > 0 ? headersObj : null,
+      };
+      if (data.hmac_secret) payload.hmac_secret = data.hmac_secret;
       return api.post('/notifications/channels', payload);
     },
     onSuccess: () => {
@@ -951,8 +964,16 @@ function NotificationsTab() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ChannelForm }) => {
-      const payload: Record<string, unknown> = { ...data };
-      if (!data.hmac_secret) delete payload.hmac_secret;
+      const headersObj: Record<string, string> = {};
+      data.custom_headers.forEach(h => { if (h.key.trim()) headersObj[h.key.trim()] = h.value; });
+      const payload: Record<string, unknown> = {
+        name: data.name,
+        webhook_url: data.webhook_url,
+        events: data.events,
+        is_active: data.is_active,
+        custom_headers: Object.keys(headersObj).length > 0 ? headersObj : null,
+      };
+      if (data.hmac_secret) payload.hmac_secret = data.hmac_secret;
       return api.put(`/notifications/channels/${id}`, payload);
     },
     onSuccess: () => {
@@ -969,15 +990,29 @@ function NotificationsTab() {
     },
   });
 
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
+      api.put(`/notifications/channels/${id}`, { is_active }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notification-channels'] });
+    },
+  });
+
   function resetForm() {
     setShowForm(false);
     setEditingId(null);
     setForm(emptyChannelForm);
+    setShowSecret(false);
+    setShowAdvanced(false);
   }
 
   function startEdit(ch: NotificationChannel) {
+    const headers = ch.custom_headers
+      ? Object.entries(ch.custom_headers).map(([key, value]) => ({ key, value }))
+      : [];
     setEditingId(ch.id);
     setShowForm(true);
+    setShowAdvanced(headers.length > 0 || ch.has_secret);
     setForm({
       name: ch.name,
       channel_type: ch.channel_type,
@@ -985,6 +1020,7 @@ function NotificationsTab() {
       events: ch.events,
       is_active: ch.is_active,
       hmac_secret: '',
+      custom_headers: headers,
     });
   }
 
@@ -1006,6 +1042,24 @@ function NotificationsTab() {
     }));
   }
 
+  function addHeader() {
+    setForm(prev => ({ ...prev, custom_headers: [...prev.custom_headers, { key: '', value: '' }] }));
+  }
+
+  function removeHeader(index: number) {
+    setForm(prev => ({
+      ...prev,
+      custom_headers: prev.custom_headers.filter((_, i) => i !== index),
+    }));
+  }
+
+  function updateHeader(index: number, field: 'key' | 'value', val: string) {
+    setForm(prev => ({
+      ...prev,
+      custom_headers: prev.custom_headers.map((h, i) => i === index ? { ...h, [field]: val } : h),
+    }));
+  }
+
   async function handleTest(id: string) {
     setTestResults(prev => ({ ...prev, [id]: 'loading' }));
     try {
@@ -1023,13 +1077,32 @@ function NotificationsTab() {
     }, 3000);
   }
 
-  function truncateUrl(url: string, maxLen = 40): string {
-    if (url.length <= maxLen) return url;
-    return url.substring(0, maxLen) + '...';
+  function severityDot(severity: string) {
+    const colors: Record<string, string> = {
+      critical: 'bg-red-500',
+      high: 'bg-orange-500',
+      warning: 'bg-yellow-500',
+      info: 'bg-blue-500',
+    };
+    return colors[severity] || 'bg-gray-400';
   }
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-40"><div className="text-gray-500 dark:text-gray-400 dark:text-gray-500">Loading notification channels...</div></div>;
+    return (
+      <div className="space-y-4">
+        {[0, 1].map(i => (
+          <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 animate-pulse">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-32 bg-gray-100 dark:bg-gray-800 rounded" />
+                <div className="h-3 w-64 bg-gray-100 dark:bg-gray-800 rounded" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   if (error) {
@@ -1038,24 +1111,42 @@ function NotificationsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">Manage webhook notification channels</p>
-        <button
-          onClick={() => { resetForm(); setShowForm(true); }}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-        >
-          <Plus className="w-4 h-4" />
-          New Channel
-        </button>
+        <div>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Configure webhook endpoints to receive real-time notifications for security events.
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            Webhooks follow the <span className="font-medium">Standard Webhooks</span> spec with HMAC-SHA256 signing and automatic retries.
+          </p>
+        </div>
+        {!showForm && (
+          <button
+            onClick={() => { resetForm(); setShowForm(true); }}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Add Webhook
+          </button>
+        )}
       </div>
 
+      {/* Create/Edit Form */}
       {showForm && (
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-            {editingId ? 'Edit Channel' : 'New Channel'}
-          </h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {editingId ? 'Edit Webhook' : 'New Webhook'}
+            </h2>
+            <button onClick={resetForm} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            {/* Name + URL */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
                 <input
@@ -1063,190 +1154,392 @@ function NotificationsTab() {
                   required
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="Channel name"
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 dark:text-gray-100"
+                  placeholder="e.g., Slack - #security-alerts"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Webhook URL</label>
-                <input
-                  type="url"
-                  required
-                  value={form.webhook_url}
-                  onChange={e => setForm({ ...form, webhook_url: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="https://hooks.example.com/..."
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Events</label>
-              <div className="flex flex-wrap gap-3">
-                {EVENT_OPTIONS.map(opt => (
-                  <label key={opt.value} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 dark:text-gray-600">
-                    <input
-                      type="checkbox"
-                      checked={form.events.includes(opt.value)}
-                      onChange={() => toggleEvent(opt.value)}
-                      className="rounded border-gray-300"
-                    />
-                    {opt.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  HMAC Secret <span className="text-gray-400 dark:text-gray-500 font-normal">(optional)</span>
+                  Endpoint URL
                 </label>
-                <input
-                  type="password"
-                  value={form.hmac_secret}
-                  onChange={e => setForm({ ...form, hmac_secret: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="Secret for webhook signature"
-                />
-              </div>
-              <div className="flex items-end">
-                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 dark:text-gray-600">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Link2 className="w-4 h-4 text-gray-400" />
+                  </div>
                   <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={e => setForm({ ...form, is_active: e.target.checked })}
-                    className="rounded border-gray-300"
+                    type="url"
+                    required
+                    value={form.webhook_url}
+                    onChange={e => setForm({ ...form, webhook_url: e.target.value })}
+                    className="w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 dark:text-gray-100"
+                    placeholder="https://hooks.example.com/webhooks/..."
                   />
-                  Active
-                </label>
+                </div>
               </div>
             </div>
 
-            <div className="flex gap-2 pt-2">
-              <button
-                type="submit"
-                disabled={createMutation.isPending || updateMutation.isPending}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {createMutation.isPending || updateMutation.isPending ? 'Saving...' : editingId ? 'Update' : 'Create'}
-              </button>
+            {/* Event Subscriptions */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Event Subscriptions</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {EVENT_OPTIONS.map(opt => {
+                  const isSelected = form.events.includes(opt.value);
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => toggleEvent(opt.value)}
+                      className={cn(
+                        'flex items-start gap-3 p-3 rounded-lg border transition-all text-left',
+                        isSelected
+                          ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      )}
+                    >
+                      <div className="mt-0.5">
+                        <div className={cn(
+                          'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors',
+                          isSelected
+                            ? 'bg-blue-600 border-blue-600'
+                            : 'border-gray-300 dark:border-gray-600'
+                        )}>
+                          {isSelected && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={cn('w-1.5 h-1.5 rounded-full', severityDot(opt.severity))} />
+                          <span className={cn('text-sm font-medium', isSelected ? 'text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300')}>
+                            {opt.label}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{opt.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {form.events.length === 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1">
+                  <Info className="w-3 h-3" /> Select at least one event to receive notifications.
+                </p>
+              )}
+            </div>
+
+            {/* Advanced Settings Toggle */}
+            <div>
               <button
                 type="button"
-                onClick={resetForm}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
               >
-                Cancel
+                {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                Advanced Settings
               </button>
+
+              {showAdvanced && (
+                <div className="mt-4 space-y-4 pl-0">
+                  {/* Signing Secret */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <Key className="w-3.5 h-3.5 text-gray-400" />
+                      Signing Secret
+                      <span className="text-xs text-gray-400 dark:text-gray-500 font-normal">(HMAC-SHA256)</span>
+                    </label>
+                    {editingId && !form.hmac_secret && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                        {(channels?.find(c => c.id === editingId)?.has_secret)
+                          ? 'A signing secret is configured. Enter a new value to replace it, or leave blank to keep.'
+                          : 'No signing secret configured.'}
+                      </p>
+                    )}
+                    <div className="relative">
+                      <input
+                        type={showSecret ? 'text' : 'password'}
+                        value={form.hmac_secret}
+                        onChange={e => setForm({ ...form, hmac_secret: e.target.value })}
+                        className="w-full px-3 py-2 pr-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 dark:text-gray-100"
+                        placeholder="whsec_..."
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSecret(!showSecret)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      >
+                        {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      Payloads are signed with <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs">Webhook-Signature</code> header per Standard Webhooks spec.
+                    </p>
+                  </div>
+
+                  {/* Custom Headers */}
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <Hash className="w-3.5 h-3.5 text-gray-400" />
+                      Custom Headers
+                    </label>
+                    <div className="space-y-2">
+                      {form.custom_headers.map((header, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={header.key}
+                            onChange={e => updateHeader(i, 'key', e.target.value)}
+                            className="w-1/3 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 dark:text-gray-100"
+                            placeholder="Header-Name"
+                          />
+                          <input
+                            type="text"
+                            value={header.value}
+                            onChange={e => updateHeader(i, 'value', e.target.value)}
+                            className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 dark:text-gray-100"
+                            placeholder="value"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeHeader(i)}
+                            className="p-2 text-gray-400 hover:text-red-500 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={addHeader}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add Header
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Error display */}
+            {(createMutation.isError || updateMutation.isError) && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-400">
+                {String((createMutation.error as any)?.response?.data?.error?.message || (updateMutation.error as any)?.response?.data?.error?.message || 'Failed to save webhook. Check all fields.')}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-800">
+              <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <button
+                  type="button"
+                  onClick={() => setForm(prev => ({ ...prev, is_active: !prev.is_active }))}
+                  className={cn(
+                    'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors',
+                    form.is_active ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+                  )}
+                >
+                  <span className={cn(
+                    'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform',
+                    form.is_active ? 'translate-x-4' : 'translate-x-0'
+                  )} />
+                </button>
+                {form.is_active ? 'Enabled' : 'Disabled'}
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createMutation.isPending || updateMutation.isPending || form.events.length === 0}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : editingId ? 'Save Changes' : 'Create Webhook'}
+                </button>
+              </div>
             </div>
           </form>
         </div>
       )}
 
-      {/* Channels Table */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 dark:bg-gray-800/50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Type</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">URL</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Events</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Active</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Created</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 dark:text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-            {channels && channels.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400 dark:text-gray-500">
-                  No notification channels configured.
-                </td>
-              </tr>
-            )}
-            {channels?.map(ch => (
-              <tr key={ch.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800/50">
-                <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{ch.name}</td>
-                <td className="px-6 py-4">
-                  <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-400">
-                    {ch.channel_type}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 dark:text-gray-500 font-mono" title={ch.webhook_url}>
-                  {truncateUrl(ch.webhook_url)}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-wrap gap-1">
-                    {ch.events.map(ev => (
-                      <span key={ev} className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 dark:text-blue-400">
-                        {ev.replace(/_/g, ' ')}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  {ch.is_active
-                    ? <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">Active</span>
-                    : <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 dark:text-gray-400 dark:text-gray-500">Inactive</span>}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">{formatDate(ch.created_at)}</td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    <button
-                      onClick={() => handleTest(ch.id)}
-                      disabled={testResults[ch.id] === 'loading'}
-                      className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded relative"
-                      title="Test"
-                    >
-                      {testResults[ch.id] === 'loading' ? (
-                        <Zap className="w-4 h-4 animate-pulse text-yellow-500" />
-                      ) : testResults[ch.id] === 'success' ? (
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                      ) : testResults[ch.id] === 'error' ? (
-                        <XCircle className="w-4 h-4 text-red-600" />
-                      ) : (
-                        <Zap className="w-4 h-4" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => startEdit(ch)}
-                      className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
-                      title="Edit"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    {deleteConfirm === ch.id ? (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => deleteMutation.mutate(ch.id)}
-                          className="px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded hover:bg-red-200 dark:hover:bg-red-800"
-                        >
-                          Confirm
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirm(null)}
-                          className="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                        >
-                          Cancel
-                        </button>
+      {/* Channel Cards */}
+      {channels && channels.length === 0 && !showForm ? (
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-dashed rounded-lg p-12 text-center">
+          <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+            <Bell className="w-6 h-6 text-gray-400" />
+          </div>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">No webhooks configured</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 max-w-sm mx-auto">
+            Add a webhook to receive real-time alerts for scan results, new vulnerabilities, and security events.
+          </p>
+          <button
+            onClick={() => { resetForm(); setShowForm(true); }}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+          >
+            <Plus className="w-4 h-4" />
+            Add Your First Webhook
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {channels?.map(ch => {
+            const headersCount = ch.custom_headers ? Object.keys(ch.custom_headers).length : 0;
+
+            return (
+              <div
+                key={ch.id}
+                className={cn(
+                  'bg-white dark:bg-gray-900 border rounded-lg transition-colors',
+                  ch.is_active
+                    ? 'border-gray-200 dark:border-gray-800'
+                    : 'border-gray-200 dark:border-gray-800 opacity-60'
+                )}
+              >
+                <div className="p-5">
+                  {/* Top Row: Icon, Name, Toggle, Actions */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className={cn(
+                        'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
+                        ch.is_active
+                          ? 'bg-blue-50 dark:bg-blue-900/20'
+                          : 'bg-gray-100 dark:bg-gray-800'
+                      )}>
+                        <Globe className={cn(
+                          'w-4.5 h-4.5',
+                          ch.is_active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'
+                        )} />
                       </div>
-                    ) : (
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{ch.name}</h3>
+                          <span className={cn(
+                            'inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded',
+                            ch.is_active
+                              ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500'
+                          )}>
+                            {ch.is_active ? 'Active' : 'Paused'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">{ch.webhook_url}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Toggle Active */}
                       <button
-                        onClick={() => setDeleteConfirm(ch.id)}
-                        className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                        title="Delete"
+                        onClick={() => toggleActiveMutation.mutate({ id: ch.id, is_active: !ch.is_active })}
+                        className={cn(
+                          'p-1.5 rounded transition-colors',
+                          ch.is_active
+                            ? 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
+                            : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        )}
+                        title={ch.is_active ? 'Pause webhook' : 'Enable webhook'}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Power className="w-4 h-4" />
                       </button>
-                    )}
+
+                      {/* Test */}
+                      <button
+                        onClick={() => handleTest(ch.id)}
+                        disabled={testResults[ch.id] === 'loading'}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                        title="Send test event"
+                      >
+                        {testResults[ch.id] === 'loading' ? (
+                          <Send className="w-4 h-4 animate-pulse text-blue-500" />
+                        ) : testResults[ch.id] === 'success' ? (
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                        ) : testResults[ch.id] === 'error' ? (
+                          <XCircle className="w-4 h-4 text-red-600" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
+                      </button>
+
+                      {/* Edit */}
+                      <button
+                        onClick={() => startEdit(ch)}
+                        className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+
+                      {/* Delete */}
+                      {deleteConfirm === ch.id ? (
+                        <div className="flex items-center gap-1 ml-1">
+                          <button
+                            onClick={() => deleteMutation.mutate(ch.id)}
+                            className="px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded hover:bg-red-200 dark:hover:bg-red-800"
+                          >
+                            Delete
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirm(null)}
+                            className="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirm(ch.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+
+                  {/* Bottom Row: Events + Metadata */}
+                  <div className="mt-3 flex items-center justify-between gap-4">
+                    <div className="flex flex-wrap gap-1.5">
+                      {ch.events.map(ev => {
+                        const eventInfo = EVENT_OPTIONS.find(e => e.value === ev);
+                        return (
+                          <span
+                            key={ev}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                          >
+                            {eventInfo && <span className={cn('w-1 h-1 rounded-full', severityDot(eventInfo.severity))} />}
+                            {ev.replace(/_/g, ' ')}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500 shrink-0">
+                      {ch.has_secret && (
+                        <span className="flex items-center gap-1" title="Signing secret configured">
+                          <Key className="w-3 h-3" /> Signed
+                        </span>
+                      )}
+                      {headersCount > 0 && (
+                        <span className="flex items-center gap-1" title={`${headersCount} custom header(s)`}>
+                          <Hash className="w-3 h-3" /> {headersCount} header{headersCount > 1 ? 's' : ''}
+                        </span>
+                      )}
+                      <span>{formatDate(ch.created_at)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -39,7 +39,7 @@ def _set_session_cookie(response: Response, user_data: dict) -> None:
         max_age=COOKIE_MAX_AGE,
         httponly=True,
         samesite="lax",
-        secure=False,  # Set True in production with HTTPS
+        secure=settings.cookie_secure,
         path="/",
     )
 
@@ -72,8 +72,10 @@ async def auth_callback(request: Request):
     try:
         token = await oauth.okta.authorize_access_token(request)
     except Exception as exc:
+        import structlog
+        structlog.get_logger("auth").error("oauth_callback_failed", error=str(exc))
         return RedirectResponse(
-            url=f"{settings.cors_origins[0]}?error=auth_failed&message={exc}",
+            url=f"{settings.cors_origins[0]}?error=auth_failed",
             status_code=302,
         )
 

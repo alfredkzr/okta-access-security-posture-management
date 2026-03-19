@@ -174,23 +174,25 @@ class PolicySimulator:
         """Construct the simulation request body from a scenario, deep-copied."""
         device: dict[str, Any] = {
             "platform": getattr(scenario, "device_platform", "WINDOWS"),
-            "registered": getattr(scenario, "device_registered", False),
-            "managed": getattr(scenario, "device_managed", False),
+            "registered": bool(getattr(scenario, "device_registered", False)),
+            "managed": bool(getattr(scenario, "device_managed", None) or False),
         }
         assurance_id = getattr(scenario, "device_assurance_id", None)
         if assurance_id:
             device["assuranceId"] = assurance_id
 
         # Okta API only supports LOW/MEDIUM/HIGH — map CRITICAL to HIGH
-        risk_level = getattr(scenario, "risk_level", "MEDIUM")
-        if isinstance(risk_level, str) and risk_level.upper() == "CRITICAL":
-            risk_level = "HIGH"
+        risk_level = getattr(scenario, "risk_level", None)
+        if risk_level is not None:
+            if isinstance(risk_level, str) and risk_level.upper() == "CRITICAL":
+                risk_level = "HIGH"
 
         policy_context: dict[str, Any] = {
             "user": {"id": user_id},
-            "risk": {"level": risk_level},
             "device": device,
         }
+        if risk_level is not None:
+            policy_context["risk"] = {"level": risk_level}
 
         # ip and zones are mutually exclusive
         ip_address = getattr(scenario, "ip_address", None)

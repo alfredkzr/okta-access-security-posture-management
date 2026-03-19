@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies import get_db, get_okta_client
+from src.api.dependencies import get_db, get_okta_client, require_auth, require_auth
 from src.api.errors import AppError
 from src.config import settings
 from src.core.okta_client import OktaClient
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/v1/settings", tags=["settings"])
 
 
 @router.get("/tenant", response_model=TenantConfigResponse)
-async def get_tenant_config():
+async def get_tenant_config(current_user: dict = Depends(require_auth)):
     token = settings.okta_api_token
     masked = ("****" + token[-4:]) if len(token) >= 4 else "****"
     return TenantConfigResponse(
@@ -35,7 +35,7 @@ async def get_tenant_config():
 
 
 @router.put("/tenant", response_model=TenantConfigResponse)
-async def update_tenant_config(body: TenantConfigUpdate):
+async def update_tenant_config(body: TenantConfigUpdate, current_user: dict = Depends(require_auth)):
     # Single-tenant mode: config comes from env vars.
     # Validate the payload but do not persist (env vars are read-only at runtime).
     return TenantConfigResponse(
@@ -47,6 +47,7 @@ async def update_tenant_config(body: TenantConfigUpdate):
 
 @router.post("/tenant/test")
 async def test_tenant_connection(
+    current_user: dict = Depends(require_auth),
     okta_client: OktaClient = Depends(get_okta_client),
 ):
     try:
@@ -104,6 +105,7 @@ async def health_check(
 @router.post("/reset", status_code=200)
 async def reset_all_data(
     confirm: str = Query(..., description="Must be 'RESET' to confirm"),
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete ALL application data for a fresh start.
@@ -179,7 +181,7 @@ async def reset_all_data(
 
 
 @router.put("/app-criticality")
-async def update_app_criticality(body: AppCriticalityUpdate):
+async def update_app_criticality(body: AppCriticalityUpdate, current_user: dict = Depends(require_auth)):
     try:
         import redis.asyncio as aioredis
 

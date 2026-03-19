@@ -73,7 +73,38 @@ async def on_startup():
     import src.models  # noqa: F401
 
     async with engine.begin() as conn:
+        # Add CLOSED to the vulnerabilitystatus enum if it doesn't exist yet
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "DO $$ BEGIN "
+                "IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'CLOSED' "
+                "AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'vulnerabilitystatus')) THEN "
+                "ALTER TYPE vulnerabilitystatus ADD VALUE 'CLOSED'; "
+                "END IF; END $$;"
+            )
+        )
         await conn.run_sync(Base.metadata.create_all)
+        # Make scenarios.risk_level nullable for existing tables
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE scenarios ALTER COLUMN risk_level DROP NOT NULL"
+            )
+        )
+        # Add acknowledged_by column if it doesn't exist yet
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "DO $$ BEGIN "
+                "ALTER TABLE vulnerabilities ADD COLUMN acknowledged_by VARCHAR(255); "
+                "EXCEPTION WHEN duplicate_column THEN NULL; "
+                "END $$;"
+            )
+        )
+        # Migrate any existing REMEDIATED vulnerabilities to CLOSED
+        await conn.execute(
+            __import__("sqlalchemy").text(
+                "UPDATE vulnerabilities SET status = 'CLOSED' WHERE status = 'REMEDIATED'"
+            )
+        )
 
 
 @app.get("/api/v1/health")

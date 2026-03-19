@@ -140,6 +140,8 @@ async def _dispatch_notification(ctx: dict, health_data: dict, previous_status: 
                 "previous_status": previous_status,
                 "current_status": health_data["status"],
                 "rate_limit_remaining_pct": health_data.get("rate_limit_remaining_pct"),
+                "rate_limit_remaining": health_data.get("rate_limit_remaining"),
+                "okta_org": settings.okta_org,
                 "checked_at": health_data["checked_at"],
             },
         )

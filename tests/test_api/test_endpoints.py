@@ -7,6 +7,7 @@ Each test creates its own data and cleans up relevant tables.
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -14,12 +15,28 @@ import httpx
 import psycopg2
 import psycopg2.extras
 import pytest
+from itsdangerous import URLSafeTimedSerializer
 
 # These tests hit a real running server at localhost:8000.
 # Start it with: uvicorn src.api.main:app --port 8000
 
 BASE_URL = "http://localhost:8000"
 SYNC_DSN = "postgresql://aspm:aspm@localhost:5432/aspm"
+
+# Must match the SECRET_KEY used by the running backend (read from .env directly)
+def _read_secret_key() -> str:
+    """Read SECRET_KEY from .env file, not from os.environ (conftest overrides it)."""
+    env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("SECRET_KEY=") and not line.startswith("#"):
+                    return line.split("=", 1)[1].strip()
+    return "NjihoDZl6dGbvtjJHwR-vGKCkQ8DhDbn5mjrjuSupHg"
+
+_SECRET_KEY = _read_secret_key()
+_SESSION_COOKIE_NAME = "aspm_session"
 
 # Table cleanup order (respects FK constraints)
 CLEANUP_TABLES = [
@@ -56,9 +73,47 @@ def db(dbconn):
     cur.close()
 
 
+def _make_session_cookie(role: str = "admin") -> str:
+    """Generate a signed session cookie matching the backend's auth scheme."""
+    serializer = URLSafeTimedSerializer(_SECRET_KEY)
+    user_data = {
+        "sub": "test-user-id",
+        "email": "testadmin@example.com",
+        "name": "Test Admin",
+        "role": role,
+        "groups": ["ASPM_Admins"] if role == "admin" else [],
+        "authenticated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    return serializer.dumps(user_data)
+
+
 @pytest.fixture
 def client():
-    """Provide a sync httpx client hitting the live API server."""
+    """Provide a sync httpx client with admin session cookie."""
+    cookie = _make_session_cookie("admin")
+    with httpx.Client(
+        base_url=BASE_URL,
+        timeout=10.0,
+        headers={"Cookie": f"{_SESSION_COOKIE_NAME}={cookie}"},
+    ) as c:
+        yield c
+
+
+@pytest.fixture
+def viewer_client():
+    """Provide a sync httpx client with viewer session cookie."""
+    cookie = _make_session_cookie("viewer")
+    with httpx.Client(
+        base_url=BASE_URL,
+        timeout=10.0,
+        headers={"Cookie": f"{_SESSION_COOKIE_NAME}={cookie}"},
+    ) as c:
+        yield c
+
+
+@pytest.fixture
+def anon_client():
+    """Provide a sync httpx client with no authentication."""
     with httpx.Client(base_url=BASE_URL, timeout=10.0) as c:
         yield c
 
@@ -748,7 +803,7 @@ class TestNotifications:
         base = {
             "name": "Test Webhook",
             "channel_type": "webhook",
-            "config": {"url": "https://hooks.example.com/test"},
+            "webhook_url": "https://hooks.example.com/test",
             "events": ["scan_completed", "new_vulnerabilities"],
             "is_active": True,
         }
@@ -762,7 +817,20 @@ class TestNotifications:
         data = resp.json()
         assert data["name"] == "Test Webhook"
         assert data["channel_type"] == "webhook"
+        assert data["webhook_url"] == "https://hooks.example.com/test"
+        assert data["events"] == ["scan_completed", "new_vulnerabilities"]
+        assert data["is_active"] is True
+        assert data["has_secret"] is False
         assert "id" in data
+        assert "created_at" in data
+        assert "updated_at" in data
+
+    def test_create_channel_with_hmac_secret(self, client, db):
+        payload = self._make_channel_payload(hmac_secret="my-secret-key")
+        resp = client.post("/api/v1/notifications/channels", json=payload)
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["has_secret"] is True
 
     def test_list_channels(self, client, db):
         client.post("/api/v1/notifications/channels", json=self._make_channel_payload(name="Ch A"))
@@ -770,7 +838,19 @@ class TestNotifications:
 
         resp = client.get("/api/v1/notifications/channels")
         assert resp.status_code == 200
-        assert len(resp.json()) == 2
+        channels = resp.json()
+        assert len(channels) == 2
+        # Verify response shape
+        for ch in channels:
+            assert "webhook_url" in ch
+            assert "events" in ch
+            assert "is_active" in ch
+            assert "created_at" in ch
+
+    def test_list_channels_empty(self, client, db):
+        resp = client.get("/api/v1/notifications/channels")
+        assert resp.status_code == 200
+        assert resp.json() == []
 
     def test_update_channel(self, client, db):
         create_resp = client.post(
@@ -785,6 +865,36 @@ class TestNotifications:
         )
         assert update_resp.status_code == 200
         assert update_resp.json()["name"] == "Updated Channel"
+        # URL should remain unchanged
+        assert update_resp.json()["webhook_url"] == "https://hooks.example.com/test"
+
+    def test_update_channel_url(self, client, db):
+        create_resp = client.post(
+            "/api/v1/notifications/channels",
+            json=self._make_channel_payload(),
+        )
+        channel_id = create_resp.json()["id"]
+
+        update_resp = client.put(
+            f"/api/v1/notifications/channels/{channel_id}",
+            json={"webhook_url": "https://new-url.example.com/hook"},
+        )
+        assert update_resp.status_code == 200
+        assert update_resp.json()["webhook_url"] == "https://new-url.example.com/hook"
+
+    def test_update_channel_events(self, client, db):
+        create_resp = client.post(
+            "/api/v1/notifications/channels",
+            json=self._make_channel_payload(),
+        )
+        channel_id = create_resp.json()["id"]
+
+        update_resp = client.put(
+            f"/api/v1/notifications/channels/{channel_id}",
+            json={"events": ["token_health"]},
+        )
+        assert update_resp.status_code == 200
+        assert update_resp.json()["events"] == ["token_health"]
 
     def test_delete_channel(self, client, db):
         create_resp = client.post(
@@ -803,6 +913,36 @@ class TestNotifications:
         fake_id = str(uuid.uuid4())
         resp = client.delete(f"/api/v1/notifications/channels/{fake_id}")
         assert resp.status_code == 404
+
+    def test_create_channel_missing_url(self, client, db):
+        payload = {
+            "name": "Bad Channel",
+            "channel_type": "webhook",
+            "events": ["scan_completed"],
+        }
+        resp = client.post("/api/v1/notifications/channels", json=payload)
+        assert resp.status_code == 422
+
+    def test_list_channels_viewer_allowed(self, viewer_client, db):
+        """Viewers can list channels."""
+        resp = viewer_client.get("/api/v1/notifications/channels")
+        assert resp.status_code == 200
+
+    def test_create_channel_viewer_allowed(self, viewer_client, db):
+        """Any authenticated user can create channels (no RBAC)."""
+        payload = {
+            "name": "Viewer Channel",
+            "channel_type": "webhook",
+            "webhook_url": "https://example.com/hook",
+            "events": ["scan_completed"],
+        }
+        resp = viewer_client.post("/api/v1/notifications/channels", json=payload)
+        assert resp.status_code == 201
+
+    def test_list_channels_anon_unauthorized(self, anon_client, db):
+        """Unauthenticated users get 401."""
+        resp = anon_client.get("/api/v1/notifications/channels")
+        assert resp.status_code == 401
 
 
 # ===========================================================================

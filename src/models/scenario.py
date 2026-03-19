@@ -32,7 +32,7 @@ class Scenario(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    risk_level: Mapped[RiskLevel] = mapped_column(nullable=False)
+    risk_level: Mapped[RiskLevel | None] = mapped_column(nullable=True)
     device_platform: Mapped[DevicePlatform] = mapped_column(nullable=False)
     device_registered: Mapped[bool] = mapped_column(Boolean, nullable=False)
     device_managed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)

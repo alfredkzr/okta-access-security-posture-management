@@ -1,14 +1,24 @@
 """Webhook notification dispatcher.
 
-Sends fire-and-forget webhook notifications to active notification channels
-whose event filters match the dispatched event. Supports HMAC-SHA256 signing.
+Implements the Standard Webhooks specification for outgoing webhooks:
+- Standard envelope: {id, type, timestamp, data}
+- HMAC-SHA256 signing: sign("{msg_id}.{timestamp}.{body}")
+- Standard headers: Webhook-Id, Webhook-Timestamp, Webhook-Signature
+- Retry with exponential backoff on 5xx/timeout
+- Unique delivery ID for consumer-side idempotency
+
+Reference: https://github.com/standard-webhooks/standard-webhooks
 """
 
 from __future__ import annotations
 
+import asyncio
+import base64
 import hashlib
-import hmac
+import hmac as hmac_mod
 import json
+import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -21,7 +31,74 @@ from src.models.notification_channel import NotificationChannel
 
 logger = structlog.get_logger(__name__)
 
-WEBHOOK_TIMEOUT = 10.0  # seconds
+# Timeouts
+CONNECT_TIMEOUT = 5.0  # seconds
+READ_TIMEOUT = 15.0  # seconds
+
+# Retry schedule (delays in seconds between attempts)
+RETRY_DELAYS = [5, 30, 300]  # 5s, 30s, 5min — 4 total attempts
+
+USER_AGENT = "OktaASPM-Webhooks/1.0"
+
+
+def _build_envelope(event: str, payload: dict[str, Any]) -> tuple[str, dict]:
+    """Build the standard webhook envelope.
+
+    Returns (message_id, envelope_dict).
+    """
+    msg_id = f"msg_{uuid.uuid4().hex[:24]}"
+    envelope = {
+        "id": msg_id,
+        "type": event,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "data": payload,
+    }
+    return msg_id, envelope
+
+
+def _sign(secret: str, msg_id: str, timestamp: int, body_bytes: bytes) -> str:
+    """Compute HMAC-SHA256 signature per Standard Webhooks spec.
+
+    signed_content = "{msg_id}.{timestamp}.{body}"
+    Returns base64-encoded signature prefixed with "v1,".
+    """
+    signed_content = f"{msg_id}.{timestamp}.".encode("utf-8") + body_bytes
+    sig = hmac_mod.new(
+        secret.encode("utf-8"),
+        signed_content,
+        hashlib.sha256,
+    ).digest()
+    return f"v1,{base64.b64encode(sig).decode('utf-8')}"
+
+
+def _build_headers(
+    msg_id: str,
+    timestamp: int,
+    event: str,
+    secret: str | None,
+    body_bytes: bytes,
+    custom_headers: dict[str, str] | None,
+    attempt: int = 1,
+) -> dict[str, str]:
+    """Build standard webhook headers."""
+    headers: dict[str, str] = {
+        "Content-Type": "application/json",
+        "User-Agent": USER_AGENT,
+        "Webhook-Id": msg_id,
+        "Webhook-Timestamp": str(timestamp),
+        "Webhook-Event-Type": event,
+    }
+
+    if attempt > 1:
+        headers["Webhook-Delivery-Attempt"] = str(attempt)
+
+    if secret:
+        headers["Webhook-Signature"] = _sign(secret, msg_id, timestamp, body_bytes)
+
+    if isinstance(custom_headers, dict):
+        headers.update(custom_headers)
+
+    return headers
 
 
 async def dispatch(event: str, payload: dict[str, Any], db_session: AsyncSession) -> None:
@@ -29,11 +106,6 @@ async def dispatch(event: str, payload: dict[str, Any], db_session: AsyncSession
 
     This function is fire-and-forget: it never raises exceptions and never
     blocks the caller on webhook failures.
-
-    Args:
-        event: The event name (e.g. "scan.completed", "vulnerability.created").
-        payload: Arbitrary JSON-serialisable data to include in the webhook body.
-        db_session: SQLAlchemy async session for querying notification channels.
     """
     try:
         channels = await _get_matching_channels(event, db_session)
@@ -45,17 +117,62 @@ async def dispatch(event: str, payload: dict[str, Any], db_session: AsyncSession
         logger.debug("notifier.no_matching_channels", notification_event=event)
         return
 
+    # Build envelope once, share across all channels
+    msg_id, envelope = _build_envelope(event, payload)
+    body_bytes = json.dumps(envelope, default=str).encode("utf-8")
+    timestamp = int(time.time())
+
     for channel in channels:
         try:
-            await _send_webhook(channel, event, payload)
+            await _send_webhook(channel, event, msg_id, timestamp, body_bytes)
         except Exception:
-            # Never propagate — notifications are best-effort
             logger.exception(
                 "notifier.webhook_failed",
                 notification_event=event,
                 channel_id=str(channel.id),
                 channel_name=channel.name,
             )
+
+
+async def dispatch_test(channel: NotificationChannel) -> dict[str, Any]:
+    """Send a test webhook using the same signing and envelope as production.
+
+    Returns a result dict with success, status_code, and message.
+    """
+    config = channel.config or {}
+    url = config.get("url")
+    if not url:
+        return {"success": False, "status_code": None, "message": "Channel config is missing 'url'"}
+
+    payload = {
+        "message": "Test notification from Okta ASPM",
+        "channel_id": str(channel.id),
+        "channel_name": channel.name,
+    }
+    msg_id, envelope = _build_envelope("test", payload)
+    body_bytes = json.dumps(envelope, default=str).encode("utf-8")
+    timestamp = int(time.time())
+
+    secret = config.get("secret")
+    custom_headers = config.get("headers")
+    headers = _build_headers(msg_id, timestamp, "test", secret, body_bytes, custom_headers)
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=CONNECT_TIMEOUT, read=READ_TIMEOUT, write=READ_TIMEOUT, pool=READ_TIMEOUT),
+        ) as client:
+            resp = await client.post(url, content=body_bytes, headers=headers)
+        return {
+            "success": resp.status_code < 400,
+            "status_code": resp.status_code,
+            "message": "Test notification sent",
+        }
+    except httpx.RequestError as exc:
+        return {
+            "success": False,
+            "status_code": None,
+            "message": f"Failed to send test notification: {exc}",
+        }
 
 
 async def _get_matching_channels(
@@ -79,12 +196,13 @@ async def _get_matching_channels(
 async def _send_webhook(
     channel: NotificationChannel,
     event: str,
-    payload: dict[str, Any],
+    msg_id: str,
+    timestamp: int,
+    body_bytes: bytes,
 ) -> None:
-    """Send a single webhook notification to a channel.
+    """Send a webhook with retries on 5xx/timeout.
 
-    Builds the request body, optionally signs it with HMAC-SHA256, and POSTs
-    to the channel's configured URL.
+    Retries use the same msg_id and timestamp so consumers can deduplicate.
     """
     config = channel.config or {}
     url = config.get("url")
@@ -96,43 +214,62 @@ async def _send_webhook(
         )
         return
 
-    # Build webhook body
-    body = {
-        "event": event,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "data": payload,
-    }
-    body_bytes = json.dumps(body, default=str).encode("utf-8")
-
-    # Build headers
-    headers: dict[str, str] = {
-        "Content-Type": "application/json",
-    }
-
-    # Add custom headers from channel config
-    custom_headers = config.get("headers")
-    if isinstance(custom_headers, dict):
-        headers.update(custom_headers)
-
-    # HMAC-SHA256 signature if a secret is configured
     secret = config.get("secret")
-    if secret:
-        signature = hmac.new(
-            secret.encode("utf-8"),
-            body_bytes,
-            hashlib.sha256,
-        ).hexdigest()
-        headers["X-Signature"] = signature
+    custom_headers = config.get("headers")
+    max_attempts = 1 + len(RETRY_DELAYS)
 
-    # Send the webhook
-    async with httpx.AsyncClient(timeout=httpx.Timeout(WEBHOOK_TIMEOUT)) as client:
-        resp = await client.post(url, content=body_bytes, headers=headers)
+    for attempt in range(1, max_attempts + 1):
+        headers = _build_headers(msg_id, timestamp, event, secret, body_bytes, custom_headers, attempt)
 
-    logger.info(
-        "notifier.webhook_sent",
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(connect=CONNECT_TIMEOUT, read=READ_TIMEOUT, write=READ_TIMEOUT, pool=READ_TIMEOUT),
+            ) as client:
+                resp = await client.post(url, content=body_bytes, headers=headers)
+
+            if resp.status_code < 500:
+                # 2xx = success, 4xx = permanent failure (don't retry)
+                logger.info(
+                    "notifier.webhook_delivered",
+                    notification_event=event,
+                    channel_id=str(channel.id),
+                    channel_name=channel.name,
+                    webhook_id=msg_id,
+                    status_code=resp.status_code,
+                    attempt=attempt,
+                )
+                return
+
+            # 5xx — retry
+            logger.warning(
+                "notifier.webhook_server_error",
+                notification_event=event,
+                channel_id=str(channel.id),
+                webhook_id=msg_id,
+                status_code=resp.status_code,
+                attempt=attempt,
+            )
+
+        except httpx.RequestError as exc:
+            logger.warning(
+                "notifier.webhook_request_error",
+                notification_event=event,
+                channel_id=str(channel.id),
+                webhook_id=msg_id,
+                error=str(exc),
+                attempt=attempt,
+            )
+
+        # Wait before next retry (if there are retries left)
+        if attempt <= len(RETRY_DELAYS):
+            delay = RETRY_DELAYS[attempt - 1]
+            await asyncio.sleep(delay)
+
+    logger.error(
+        "notifier.webhook_exhausted",
         notification_event=event,
         channel_id=str(channel.id),
         channel_name=channel.name,
-        url=url,
-        status_code=resp.status_code,
+        webhook_id=msg_id,
+        total_attempts=max_attempts,
     )

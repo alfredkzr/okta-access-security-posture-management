@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Trash2, Plus, Send } from 'lucide-react';
 import api from '../lib/api';
 
-const EVENTS = ['scan_completed', 'new_vulnerabilities', 'posture_critical', 'token_health'];
+const EVENTS = ['scan_completed', 'new_vulnerabilities', 'token_health'];
 
 export default function Notifications() {
   const qc = useQueryClient();

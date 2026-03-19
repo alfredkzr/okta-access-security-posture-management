@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.dependencies import get_db
+from src.api.dependencies import get_db, require_auth
 from src.models.audit_log import AuditLog
 from src.schemas.common import PaginatedResponse
 
@@ -22,6 +22,7 @@ async def list_audit_logs(
     date_to: datetime | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(AuditLog)

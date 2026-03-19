@@ -14,6 +14,7 @@ class ReportResponse(BaseModel):
     scan_id: uuid.UUID
     report_type: str
     file_path: str | None = None
+    content: str | None = None
     generated_at: datetime
     created_at: datetime
 

@@ -20,7 +20,7 @@ export default function Dashboard() {
 
   const { data: topVulns, isLoading: vulnsLoading } = useQuery<PaginatedResponse<Vulnerability>>({
     queryKey: ['top-vulnerabilities'],
-    queryFn: () => api.get('/vulnerabilities', { params: { status: 'ACTIVE', page: 1, page_size: 5 } }).then(r => r.data),
+    queryFn: () => api.get('/vulnerabilities', { params: { status: 'ACTIVE', sort: '-risk_score', page: 1, page_size: 5 } }).then(r => r.data),
   });
 
   const scanMutation = useMutation({

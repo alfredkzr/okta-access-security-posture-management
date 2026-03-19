@@ -24,12 +24,13 @@ class VulnerabilityResponse(BaseModel):
     first_detected: datetime
     last_detected: datetime
     remediated_at: datetime | None = None
+    acknowledged_by: str | None = None
 
     model_config = {"from_attributes": True}
 
 
 class VulnerabilityUpdateRequest(BaseModel):
-    status: str  # ACTIVE, REMEDIATED, ACKNOWLEDGED
+    status: str  # ACTIVE, CLOSED, ACKNOWLEDGED
 
 
 class VulnerabilityImpactResponse(BaseModel):
@@ -57,7 +58,7 @@ class VulnerabilityDetailResponse(VulnerabilityResponse):
 class VulnerabilityStatsResponse(BaseModel):
     total: int
     active: int
-    remediated: int
+    closed: int
     acknowledged: int
     by_severity: dict[str, int]
     by_category: dict[str, int]

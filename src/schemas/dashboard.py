@@ -4,7 +4,7 @@ from pydantic import BaseModel
 class DashboardSummaryResponse(BaseModel):
     total_vulnerabilities: int
     active_vulnerabilities: int
-    remediated_vulnerabilities: int
+    closed_vulnerabilities: int
     acknowledged_vulnerabilities: int
     by_severity: dict[str, int]
     by_category: dict[str, int]

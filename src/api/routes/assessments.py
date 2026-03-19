@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.audit import log_audit
-from src.api.dependencies import get_db, get_okta_client
+from src.api.dependencies import get_db, get_okta_client, require_auth, require_auth
 from src.api.errors import AppError
 from src.config import settings
 from src.core.okta_client import OktaClient
@@ -116,6 +116,7 @@ async def run_single_assessment(
     body: SingleAssessmentRequest,
     background_tasks: BackgroundTasks,
     request: Request,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     # Create and commit the scan record before starting background work
@@ -129,7 +130,7 @@ async def run_single_assessment(
     await db.refresh(scan)
 
     # Audit log
-    actor = request.headers.get("X-Actor-Email", "system")
+    actor = current_user.get("email", "unknown")
     ip = request.client.host if request.client else "unknown"
     await log_audit(
         db, actor, "scan_started", "scan", str(scan.id),
@@ -148,6 +149,7 @@ async def run_single_assessment(
 @router.post("/batch", response_model=ScanSummaryResponse, status_code=201)
 async def run_batch_assessment(
     body: BatchAssessmentRequest,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     scan = Scan(
@@ -202,6 +204,7 @@ async def run_batch_assessment(
 @router.get("/{scan_id}", response_model=ScanSummaryResponse)
 async def get_scan(
     scan_id: uuid.UUID,
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Scan).where(Scan.id == scan_id))
@@ -216,6 +219,7 @@ async def get_scan_results(
     scan_id: uuid.UUID,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     scan_result = await db.execute(select(Scan).where(Scan.id == scan_id))
@@ -252,6 +256,7 @@ async def get_scan_posture(
     scan_id: uuid.UUID,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     scan_result = await db.execute(select(Scan).where(Scan.id == scan_id))
@@ -284,7 +289,7 @@ async def get_scan_posture(
 
 
 @router.get("/{scan_id}/stream")
-async def stream_scan_progress(scan_id: uuid.UUID):
+async def stream_scan_progress(scan_id: uuid.UUID, current_user: dict = Depends(require_auth)):
     """SSE endpoint that polls scan status until complete."""
 
     async def event_generator():
@@ -314,6 +319,7 @@ async def stream_scan_progress(scan_id: uuid.UUID):
 async def list_scans(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
     count_stmt = select(func.count(Scan.id))

@@ -176,8 +176,11 @@ async def _persist_user_data(
     user_id = user["id"]
     user_email = profile.get("email", profile.get("login", data.email))
 
-    # Pre-scan: resolve existing impacts for this user
-    pre_scan_vuln_ids = await vulnerability_engine.pre_scan_resolve_impacts(db_session, user_email)
+    # Pre-scan: resolve existing impacts for this user, scoped to scenarios being tested
+    scenario_names = list({sd.scenario_name for sd in data.sims})
+    pre_scan_vuln_ids = await vulnerability_engine.pre_scan_resolve_impacts(
+        db_session, user_email, scenario_names=scenario_names if scenario_names else None,
+    )
     vulnerability_ids: set[uuid.UUID] = set(pre_scan_vuln_ids)
     violations_found = 0
     inactive_apps = 0
@@ -233,6 +236,7 @@ async def _persist_user_data(
                 scenario_name=sd.scenario_name,
                 rule_action=sd.rule_action,
                 risk_score=risk_score,
+                scenario_risk_level=sd.scenario_risk_level,
             )
             vulnerability_ids.add(vuln.id)
             violations_found += 1
@@ -264,15 +268,44 @@ async def _persist_user_data(
 
     await db_session.flush()
 
-    # Fire notification for HIGH/CRITICAL vulnerabilities (best-effort)
+    # Fire notification for vulnerabilities (best-effort)
     if violations_found > 0:
         try:
             from src.core.notifier import dispatch as notify
+
+            # Build per-vulnerability detail list
+            vuln_details = []
+            max_risk_score = 0
+            for sd in data.sims:
+                if sd.access_decision == "ALLOW" and sd.rule_action is not None:
+                    sev = determine_policy_violation_severity(
+                        sd.factor_mode, sd.phishing_resistant,
+                    ).value
+                    app_name = sd.app.get("label", sd.app.get("name", ""))
+                    risk_input = RiskInput(
+                        severity=sev,
+                        scenario_risk_level=sd.scenario_risk_level,
+                        affected_user_count=1,
+                        requires_mfa=sd.factor_mode is not None and sd.factor_mode != "" and sd.factor_mode != "1FA",
+                        phishing_resistant=sd.phishing_resistant,
+                    )
+                    score = calculate_risk_score(risk_input)
+                    max_risk_score = max(max_risk_score, score)
+                    vuln_details.append({
+                        "title": f"Policy allows access: {app_name}",
+                        "severity": sev,
+                        "app_name": app_name,
+                        "rule_name": sd.sim_result.rule_name,
+                        "scenario_name": sd.scenario_name,
+                        "risk_score": score,
+                    })
+
             await notify("new_vulnerabilities", {
                 "scan_id": str(scan_id),
                 "user_email": user_email,
                 "count": violations_found,
-                "severity": "HIGH",
+                "max_risk_score": max_risk_score,
+                "vulnerabilities": vuln_details,
             }, db_session)
         except Exception:
             logger.debug("vuln_notification_failed", user_email=user_email)
@@ -510,13 +543,42 @@ async def run_batch_scan(
     # Fire notification (best-effort)
     try:
         from src.core.notifier import dispatch as notify
+        from src.models.vulnerability import Vulnerability, VulnerabilityStatus
+        from src.models.posture_finding import PostureFinding, FindingStatus
+        from sqlalchemy import func as sa_func
+
+        # Query vulnerability counts for this scan's impacts
+        vuln_stmt = (
+            select(
+                sa_func.count().label("total"),
+                sa_func.count().filter(Vulnerability.severity.in_(["CRITICAL"])).label("critical"),
+                sa_func.count().filter(Vulnerability.severity.in_(["HIGH"])).label("high"),
+            )
+            .where(Vulnerability.status == VulnerabilityStatus.ACTIVE)
+        )
+        vuln_row = (await db_session.execute(vuln_stmt)).one()
+
+        # Query posture findings count for this scan
+        posture_stmt = (
+            select(sa_func.count())
+            .where(PostureFinding.scan_id == scan_id)
+            .where(PostureFinding.status == FindingStatus.OPEN)
+        )
+        posture_count = (await db_session.execute(posture_stmt)).scalar() or 0
+
         await notify("scan_completed", {
             "scan_id": str(scan_id),
+            "job_name": scan.job_name,
             "status": scan.status.value,
             "total_users": total_users,
             "successful_users": successful_users,
             "failed_users": failed_users,
             "duration_seconds": scan.duration_seconds,
+            "started_at": scan.started_at.isoformat() if scan.started_at else None,
+            "vulnerabilities_found": vuln_row.total,
+            "critical_count": vuln_row.critical,
+            "high_count": vuln_row.high,
+            "posture_findings_count": posture_count,
         }, db_session)
     except Exception:
         logger.debug("batch_scan_notification_failed", scan_id=str(scan_id))
