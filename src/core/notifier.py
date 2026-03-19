@@ -36,7 +36,7 @@ CONNECT_TIMEOUT = 5.0  # seconds
 READ_TIMEOUT = 15.0  # seconds
 
 # Retry schedule (delays in seconds between attempts)
-RETRY_DELAYS = [5, 30, 300]  # 5s, 30s, 5min — 4 total attempts
+RETRY_DELAYS = [2, 5]  # 2s, 5s — 3 total attempts (keep it fast, don't block callers)
 
 USER_AGENT = "OktaASPM-Webhooks/1.0"
 
@@ -227,8 +227,8 @@ async def _send_webhook(
             ) as client:
                 resp = await client.post(url, content=body_bytes, headers=headers)
 
-            if resp.status_code < 500:
-                # 2xx = success, 4xx = permanent failure (don't retry)
+            if resp.status_code < 400:
+                # 2xx/3xx = success
                 logger.info(
                     "notifier.webhook_delivered",
                     notification_event=event,
@@ -240,14 +240,29 @@ async def _send_webhook(
                 )
                 return
 
-            # 5xx — retry
+            if 400 <= resp.status_code < 500 and resp.status_code != 429:
+                # 4xx (except 429) = permanent failure, don't retry
+                logger.warning(
+                    "notifier.webhook_client_error",
+                    notification_event=event,
+                    channel_id=str(channel.id),
+                    channel_name=channel.name,
+                    webhook_id=msg_id,
+                    status_code=resp.status_code,
+                    attempt=attempt,
+                )
+                return
+
+            # 429 or 5xx — retry
+            retry_after = resp.headers.get("Retry-After")
             logger.warning(
-                "notifier.webhook_server_error",
+                "notifier.webhook_retryable_error",
                 notification_event=event,
                 channel_id=str(channel.id),
                 webhook_id=msg_id,
                 status_code=resp.status_code,
                 attempt=attempt,
+                retry_after=retry_after,
             )
 
         except httpx.RequestError as exc:

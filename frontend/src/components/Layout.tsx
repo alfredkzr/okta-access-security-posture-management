@@ -20,11 +20,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
       <aside className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-800">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Okta ASPM</h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Security Posture Management</p>
+        {/* Brand */}
+        <div className="p-5 border-b border-gray-200 dark:border-gray-800">
+          <Link to="/" className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+              <Shield className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-sm font-bold text-gray-900 dark:text-gray-100 tracking-tight leading-tight">
+                Okta Access
+              </h1>
+              <p className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider leading-tight">
+                Security Posture
+              </p>
+            </div>
+          </Link>
         </div>
-        <nav className="flex-1 p-4 space-y-1">
+
+        <nav className="flex-1 p-3 space-y-0.5">
           {nav.map(({ path, label, icon: Icon }) => {
             const active = path === '/' ? loc.pathname === '/' : loc.pathname.startsWith(path);
             return (
@@ -40,12 +53,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* User section at bottom */}
+        {/* User section */}
         {user && (
-          <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+          <div className="p-3 border-t border-gray-200 dark:border-gray-800">
             <div className="flex items-center gap-3 px-3 py-2">
-              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user.name}</p>
@@ -53,10 +66,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            {/* Theme toggle */}
             <button
               onClick={toggle}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200 transition-colors w-full mt-1"
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200 transition-colors w-full mt-0.5"
             >
               {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
               {theme === 'light' ? 'Dark mode' : 'Light mode'}

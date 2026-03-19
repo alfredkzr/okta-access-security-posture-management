@@ -30,9 +30,9 @@ class RiskScenario:
 
     name: str
     description: str
-    risk_level: RiskLevel
     device_platform: DevicePlatform
-    device_registered: bool
+    device_registered: bool = False
+    risk_level: RiskLevel | None = None
     device_managed: bool = False
     device_assurance_id: str | None = None
     ip_address: str | None = None
@@ -57,14 +57,15 @@ class RiskScenario:
         if self.device_assurance_id is not None:
             device["assuranceId"] = self.device_assurance_id
 
-        # Okta API only supports LOW/MEDIUM/HIGH — map CRITICAL to HIGH
-        okta_risk_level = "HIGH" if self.risk_level == RiskLevel.CRITICAL else self.risk_level.value
-
         policy_context: dict = {
             "user": {"id": user_id},
-            "risk": {"level": okta_risk_level},
             "device": device,
         }
+
+        if self.risk_level is not None:
+            # Okta API only supports LOW/MEDIUM/HIGH — map CRITICAL to HIGH
+            okta_risk_level = "HIGH" if self.risk_level == RiskLevel.CRITICAL else self.risk_level.value
+            policy_context["risk"] = {"level": okta_risk_level}
 
         # ip and zones are mutually exclusive
         if self.ip_address is not None:
@@ -83,68 +84,51 @@ class RiskScenario:
 
 DEFAULT_SCENARIOS: list[RiskScenario] = [
     RiskScenario(
-        name="Personal Windows Device, Medium Risk, No Network Zone",
-        description=(
-            "Simulates access from a personal (unregistered, unmanaged) Windows device "
-            "at medium risk level with no network zone restrictions."
-        ),
-        risk_level=RiskLevel.MEDIUM,
+        name="Personal Windows",
+        description="Simulates access from an unregistered, unmanaged Windows device.",
         device_platform=DevicePlatform.WINDOWS,
         device_registered=False,
         device_managed=False,
     ),
     RiskScenario(
-        name="Personal macOS Device, Medium Risk, No Network Zone",
-        description=(
-            "Simulates access from a personal (unregistered, unmanaged) macOS device "
-            "at medium risk level with no network zone restrictions."
-        ),
-        risk_level=RiskLevel.MEDIUM,
+        name="Personal macOS",
+        description="Simulates access from an unregistered, unmanaged macOS device.",
         device_platform=DevicePlatform.MACOS,
         device_registered=False,
         device_managed=False,
     ),
     RiskScenario(
-        name="Personal ChromeOS Device, Medium Risk, No Network Zone",
-        description=(
-            "Simulates access from a personal (unregistered, unmanaged) ChromeOS device "
-            "at medium risk level with no network zone restrictions."
-        ),
-        risk_level=RiskLevel.MEDIUM,
+        name="Personal ChromeOS",
+        description="Simulates access from an unregistered, unmanaged ChromeOS device.",
         device_platform=DevicePlatform.CHROMEOS,
         device_registered=False,
         device_managed=False,
     ),
     RiskScenario(
-        name="Personal Android Device, Medium Risk, No Network Zone",
-        description=(
-            "Simulates access from a personal (unregistered, unmanaged) Android device "
-            "at medium risk level with no network zone restrictions."
-        ),
-        risk_level=RiskLevel.MEDIUM,
+        name="Personal Android",
+        description="Simulates access from an unregistered, unmanaged Android device.",
         device_platform=DevicePlatform.ANDROID,
         device_registered=False,
         device_managed=False,
     ),
     RiskScenario(
-        name="Personal iOS Device, Medium Risk, No Network Zone",
-        description=(
-            "Simulates access from a personal (unregistered, unmanaged) iOS device "
-            "at medium risk level with no network zone restrictions."
-        ),
-        risk_level=RiskLevel.MEDIUM,
+        name="Personal iOS",
+        description="Simulates access from an unregistered, unmanaged iOS device.",
         device_platform=DevicePlatform.IOS,
         device_registered=False,
         device_managed=False,
     ),
     RiskScenario(
-        name="Unknown Desktop Device, High Risk, No Network Zone",
-        description=(
-            "Simulates access from an unknown desktop device "
-            "at high risk level with no network zone restrictions."
-        ),
-        risk_level=RiskLevel.HIGH,
+        name="Unknown Desktop",
+        description="Simulates access from an unknown desktop device.",
         device_platform=DevicePlatform.DESKTOP_OTHER,
+        device_registered=False,
+        device_managed=False,
+    ),
+    RiskScenario(
+        name="Unknown Mobile",
+        description="Simulates access from an unknown mobile device.",
+        device_platform=DevicePlatform.MOBILE_OTHER,
         device_registered=False,
         device_managed=False,
     ),

@@ -51,12 +51,13 @@ const emptyForm: ScenarioForm = {
 };
 
 const DEFAULT_SCENARIOS: Omit<ScenarioForm, 'is_active' | 'network_mode'>[] = [
-  { name: 'Personal Windows Device, Medium Risk, No Network Zone', description: 'Simulates access from an unmanaged personal Windows device at medium risk with no network zone restrictions.', risk_level: 'MEDIUM', device_platform: 'WINDOWS', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
-  { name: 'Personal macOS Device, Medium Risk, No Network Zone', description: 'Simulates access from an unmanaged personal macOS device at medium risk with no network zone restrictions.', risk_level: 'MEDIUM', device_platform: 'MACOS', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
-  { name: 'Personal ChromeOS Device, Medium Risk, No Network Zone', description: 'Simulates access from an unmanaged personal ChromeOS device at medium risk with no network zone restrictions.', risk_level: 'MEDIUM', device_platform: 'CHROMEOS', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
-  { name: 'Personal Android Device, Medium Risk, No Network Zone', description: 'Simulates access from an unmanaged personal Android device at medium risk with no network zone restrictions.', risk_level: 'MEDIUM', device_platform: 'ANDROID', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
-  { name: 'Personal iOS Device, Medium Risk, No Network Zone', description: 'Simulates access from an unmanaged personal iOS device at medium risk with no network zone restrictions.', risk_level: 'MEDIUM', device_platform: 'IOS', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
-  { name: 'Unknown Desktop Device, High Risk, No Network Zone', description: 'Simulates access from an unknown desktop device at high risk with no network zone restrictions.', risk_level: 'HIGH', device_platform: 'DESKTOP_OTHER', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
+  { name: 'Personal Windows', description: 'Simulates access from an unregistered, unmanaged Windows device.', risk_level: '', device_platform: 'WINDOWS', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
+  { name: 'Personal macOS', description: 'Simulates access from an unregistered, unmanaged macOS device.', risk_level: '', device_platform: 'MACOS', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
+  { name: 'Personal ChromeOS', description: 'Simulates access from an unregistered, unmanaged ChromeOS device.', risk_level: '', device_platform: 'CHROMEOS', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
+  { name: 'Personal Android', description: 'Simulates access from an unregistered, unmanaged Android device.', risk_level: '', device_platform: 'ANDROID', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
+  { name: 'Personal iOS', description: 'Simulates access from an unregistered, unmanaged iOS device.', risk_level: '', device_platform: 'IOS', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
+  { name: 'Unknown Desktop', description: 'Simulates access from an unknown desktop device.', risk_level: '', device_platform: 'DESKTOP_OTHER', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
+  { name: 'Unknown Mobile', description: 'Simulates access from an unknown mobile device.', risk_level: '', device_platform: 'MOBILE_OTHER', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
 ];
 
 /** Convert form state to API payload */
@@ -152,9 +153,14 @@ export default function Scenarios() {
     },
   });
 
-  const importMutation = useMutation({
-    mutationFn: () => api.post('/scenarios/import', { scenarios: DEFAULT_SCENARIOS }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scenarios'] }),
+  const [resetConfirm, setResetConfirm] = useState(false);
+
+  const resetMutation = useMutation({
+    mutationFn: () => api.post('/scenarios/reset'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scenarios'] });
+      setResetConfirm(false);
+    },
   });
 
   function resetForm() {
@@ -233,14 +239,32 @@ export default function Scenarios() {
             <Download className="w-4 h-4" />
             Export
           </button>
-          <button
-            onClick={() => importMutation.mutate()}
-            disabled={importMutation.isPending}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
-          >
-            <Upload className="w-4 h-4" />
-            {importMutation.isPending ? 'Importing...' : 'Import Defaults'}
-          </button>
+          {resetConfirm ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
+              <span className="text-sm text-red-700 dark:text-red-400">Delete all scenarios and reset?</span>
+              <button
+                onClick={() => resetMutation.mutate()}
+                disabled={resetMutation.isPending}
+                className="px-3 py-1 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50"
+              >
+                {resetMutation.isPending ? 'Resetting...' : 'Yes, reset'}
+              </button>
+              <button
+                onClick={() => setResetConfirm(false)}
+                className="px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setResetConfirm(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              <Upload className="w-4 h-4" />
+              Reset to Defaults
+            </button>
+          )}
           <button
             onClick={() => { resetForm(); setShowForm(true); }}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"

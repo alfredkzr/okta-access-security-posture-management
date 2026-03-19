@@ -268,12 +268,11 @@ async def _persist_user_data(
 
     await db_session.flush()
 
-    # Fire notification for vulnerabilities (best-effort)
+    # Fire notification for vulnerabilities (fire-and-forget, never blocks scan)
     if violations_found > 0:
         try:
             from src.core.notifier import dispatch as notify
 
-            # Build per-vulnerability detail list
             vuln_details = []
             max_risk_score = 0
             for sd in data.sims:
@@ -300,13 +299,13 @@ async def _persist_user_data(
                         "risk_score": score,
                     })
 
-            await notify("new_vulnerabilities", {
+            asyncio.create_task(notify("new_vulnerabilities", {
                 "scan_id": str(scan_id),
                 "user_email": user_email,
                 "count": violations_found,
                 "max_risk_score": max_risk_score,
                 "vulnerabilities": vuln_details,
-            }, db_session)
+            }, db_session))
         except Exception:
             logger.debug("vuln_notification_failed", user_email=user_email)
 
@@ -566,7 +565,7 @@ async def run_batch_scan(
         )
         posture_count = (await db_session.execute(posture_stmt)).scalar() or 0
 
-        await notify("scan_completed", {
+        asyncio.create_task(notify("scan_completed", {
             "scan_id": str(scan_id),
             "job_name": scan.job_name,
             "status": scan.status.value,
@@ -579,7 +578,7 @@ async def run_batch_scan(
             "critical_count": vuln_row.critical,
             "high_count": vuln_row.high,
             "posture_findings_count": posture_count,
-        }, db_session)
+        }, db_session))
     except Exception:
         logger.debug("batch_scan_notification_failed", scan_id=str(scan_id))
 

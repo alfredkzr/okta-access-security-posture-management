@@ -80,16 +80,24 @@ async def _run_single_scan_background(scan_id: uuid.UUID, email: str):
 
             await db.commit()
 
-        # Fire notification (best-effort, separate session)
+        # Fire notification (fire-and-forget, separate session)
         try:
+            import asyncio as _asyncio
             from src.core.notifier import dispatch as notify
-            async with async_session() as notify_db:
-                await notify("scan_completed", {
-                    "scan_id": str(scan_id),
-                    "status": scan.status.value if hasattr(scan.status, "value") else str(scan.status),
-                    "total_users": 1,
-                    "duration_seconds": scan.duration_seconds,
-                }, notify_db)
+
+            async def _notify_scan_done():
+                try:
+                    async with async_session() as notify_db:
+                        await notify("scan_completed", {
+                            "scan_id": str(scan_id),
+                            "status": scan.status.value if hasattr(scan.status, "value") else str(scan.status),
+                            "total_users": 1,
+                            "duration_seconds": scan.duration_seconds,
+                        }, notify_db)
+                except Exception:
+                    pass
+
+            _asyncio.create_task(_notify_scan_done())
         except Exception:
             pass  # Notifications are best-effort
 

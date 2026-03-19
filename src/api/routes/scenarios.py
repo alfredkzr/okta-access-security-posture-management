@@ -3,7 +3,7 @@
 import uuid
 
 import structlog
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 from sqlalchemy import delete, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -136,7 +136,7 @@ async def delete_scenario(
 
 @router.post("/import", response_model=list[ScenarioResponse], status_code=201)
 async def import_scenarios(
-    scenarios: list[ScenarioCreate],
+    scenarios: list[ScenarioCreate] = Body(...),
     current_user: dict = Depends(require_auth),
     db: AsyncSession = Depends(get_db),
 ):
@@ -148,6 +148,51 @@ async def import_scenarios(
     await db.flush()
     for s in created:
         await db.refresh(s)
+    return created
+
+
+@router.post("/reset", response_model=list[ScenarioResponse], status_code=201)
+async def reset_scenarios(
+    request: Request,
+    current_user: dict = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete all existing scenarios and recreate the defaults."""
+    from src.core.risk_scenarios import DEFAULT_SCENARIOS
+
+    # Delete all existing scenarios
+    await db.execute(delete(Scenario))
+
+    # Create defaults
+    created = []
+    for rs in DEFAULT_SCENARIOS:
+        scenario = Scenario(
+            name=rs.name,
+            description=rs.description,
+            is_active=rs.is_active,
+            risk_level=rs.risk_level,
+            device_platform=rs.device_platform,
+            device_registered=rs.device_registered,
+            device_managed=rs.device_managed,
+            device_assurance_id=rs.device_assurance_id,
+            ip_address=rs.ip_address,
+            zone_ids=rs.zone_ids or None,
+        )
+        db.add(scenario)
+        created.append(scenario)
+
+    await db.flush()
+    for s in created:
+        await db.refresh(s)
+
+    actor = current_user.get("email", "unknown")
+    ip = request.client.host if request.client else "unknown"
+    await log_audit(
+        db, actor, "scenario_updated", "scenario", "all",
+        details={"action": "reset_to_defaults", "count": len(created)},
+        ip_address=ip,
+    )
+
     return created
 
 
