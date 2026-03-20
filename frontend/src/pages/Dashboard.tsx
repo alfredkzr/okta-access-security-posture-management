@@ -38,6 +38,16 @@ export default function Dashboard() {
     },
   });
 
+  const batchScanMutation = useMutation({
+    mutationFn: () => api.post('/assessments/batch', {
+      user_selection: 'all',
+      include_posture_checks: true,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -204,26 +214,35 @@ export default function Dashboard() {
             <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Recent Scans</h2>
           </div>
           <div className="p-4">
-            {/* Inline Scan User */}
-            <div className="flex gap-2 mb-4">
-              <input
-                type="email"
-                value={scanEmail}
-                onChange={e => setScanEmail(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && scanEmail.trim()) {
-                    scanMutation.mutate(scanEmail.trim());
-                  }
-                }}
-                placeholder="user@example.com"
-                className="flex-1 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+            {/* Scan Actions */}
+            <div className="space-y-2 mb-4">
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={scanEmail}
+                  onChange={e => setScanEmail(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && scanEmail.trim()) {
+                      scanMutation.mutate(scanEmail.trim());
+                    }
+                  }}
+                  placeholder="user@example.com"
+                  className="flex-1 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <button
+                  onClick={() => scanEmail.trim() && scanMutation.mutate(scanEmail.trim())}
+                  disabled={!scanEmail.trim() || scanMutation.isPending}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {scanMutation.isPending ? 'Starting...' : 'Scan User'}
+                </button>
+              </div>
               <button
-                onClick={() => scanEmail.trim() && scanMutation.mutate(scanEmail.trim())}
-                disabled={!scanEmail.trim() || scanMutation.isPending}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                onClick={() => batchScanMutation.mutate()}
+                disabled={batchScanMutation.isPending}
+                className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {scanMutation.isPending ? 'Starting...' : 'Scan User'}
+                {batchScanMutation.isPending ? 'Starting...' : 'Scan All Users'}
               </button>
             </div>
             {scanMutation.isError && (
@@ -233,6 +252,14 @@ export default function Dashboard() {
             )}
             {scanMutation.isSuccess && (
               <p className="text-green-600 dark:text-green-400 text-xs mb-3">Scan started successfully.</p>
+            )}
+            {batchScanMutation.isError && (
+              <p className="text-red-600 dark:text-red-400 text-xs mb-3">
+                {(batchScanMutation.error as Error)?.message || 'Batch scan failed.'}
+              </p>
+            )}
+            {batchScanMutation.isSuccess && (
+              <p className="text-green-600 dark:text-green-400 text-xs mb-3">Batch scan queued. Check recent scans for progress.</p>
             )}
 
             {/* Scan List */}

@@ -78,7 +78,7 @@ Generate CSV, PDF, and JSON reports from persisted data.
 
 ### Milestone 7: Frontend
 Build the React dashboard. (Frontend architecture defined in separate spec or discovered during development.)
-- Pages: Login, Dashboard, Scan History, Scan Detail, Vulnerabilities List, Vulnerability Detail, Posture Findings, Scenarios CRUD, Settings, Reports
+- Pages: Login, Dashboard, Scan History, Scan Detail, Vulnerabilities List, Vulnerability Detail, Scenarios CRUD, Settings, Reports
 - State management: TanStack Query for server state
 - Auth: Okta OIDC redirect flow
 - **Done when:** A user can log in, run a scan, see results, and download reports through the UI.

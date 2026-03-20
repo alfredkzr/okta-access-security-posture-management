@@ -9,7 +9,7 @@
 
 A security platform that **dynamically simulates access attempts** against your Okta tenant's authentication policies and flags cases where risky access is incorrectly allowed. Unlike static config scanners, this uses the Okta Policy Simulation API to test whether policies actually work under realistic threat conditions.
 
-This is an open-source rebuild of a project originally presented at [Oktane 2025 — Build Your Own Security Tools Using Okta and Auth0 APIs](https://www.okta.com/oktane/on-demand/2025/showcase-build-your-own-security-tools-using-okta-and-auth0-apis/).
+This is an open-source rebuild of a project I originally presented at [Oktane 2025 — Build Your Own Security Tools Using Okta and Auth0 APIs](https://www.okta.com/oktane/on-demand/2025/showcase-build-your-own-security-tools-using-okta-and-auth0-apis/).
 
 ## Features
 
@@ -37,7 +37,7 @@ This is an open-source rebuild of a project originally presented at [Oktane 2025
 ### 1. Configure
 
 ```bash
-git clone https://github.com/<your-username>/okta-access-security-posture-management.git
+git clone https://github.com/alfredkzr/okta-access-security-posture-management.git
 cd okta-access-security-posture-management
 cp .env.example .env
 ```

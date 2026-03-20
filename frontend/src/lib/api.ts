@@ -6,6 +6,17 @@ const api = axios.create({
   withCredentials: true,
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Session expired — redirect to login
+      window.location.href = '/';
+    }
+    return Promise.reject(error);
+  },
+);
+
 export default api;
 
 export interface PaginatedResponse<T> {
