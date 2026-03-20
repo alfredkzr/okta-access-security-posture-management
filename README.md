@@ -16,7 +16,6 @@ This is an open-source rebuild of a project I originally presented at [Oktane 20
 ## Features
 
 - **Policy Simulation** — Tests user x app x scenario combinations against Okta's policy engine. Reports when access is allowed that should be denied.
-- **Posture Checks** — Static analysis of admin security and MFA gaps (the MGM/Caesars attack vectors: help desk MFA reset, shadow admins, weak factors).
 - **Risk Scoring** — Composite 0-100 scores factoring severity, user privilege, app criticality, exposure breadth, and auth strength.
 - **Vulnerability Lifecycle** — Tracks findings across scans with automatic remediation detection. No duplicates.
 - **Reports** — CSV, PDF, and JSON exports.
