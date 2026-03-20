@@ -222,6 +222,7 @@ async def update_vulnerability_status(
 
     await db.flush()
     await db.refresh(vuln)
+    await db.commit()
     return vuln
 
 
@@ -240,7 +241,7 @@ async def _auto_reconcile(db: AsyncSession, vuln: Vulnerability) -> None:
         return  # User-acknowledged — don't auto-change
 
     active_count_stmt = (
-        select(func.count(VulnerabilityImpact.id))
+        select(func.count(VulnerabilityImpact.user_email.distinct()))
         .where(
             VulnerabilityImpact.vulnerability_id == vuln.id,
             VulnerabilityImpact.status == ImpactStatus.ACTIVE,
@@ -266,8 +267,8 @@ async def _auto_reconcile_all(db: AsyncSession) -> None:
             Vulnerability.id,
             func.count(
                 case(
-                    (VulnerabilityImpact.status == ImpactStatus.ACTIVE, VulnerabilityImpact.id),
-                )
+                    (VulnerabilityImpact.status == ImpactStatus.ACTIVE, VulnerabilityImpact.user_email),
+                ).distinct()
             ).label("active_count"),
         )
         .outerjoin(VulnerabilityImpact, VulnerabilityImpact.vulnerability_id == Vulnerability.id)
@@ -276,8 +277,8 @@ async def _auto_reconcile_all(db: AsyncSession) -> None:
         .having(
             func.count(
                 case(
-                    (VulnerabilityImpact.status == ImpactStatus.ACTIVE, VulnerabilityImpact.id),
-                )
+                    (VulnerabilityImpact.status == ImpactStatus.ACTIVE, VulnerabilityImpact.user_email),
+                ).distinct()
             ) == 0
         )
     ).subquery()

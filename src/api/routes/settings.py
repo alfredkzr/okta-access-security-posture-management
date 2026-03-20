@@ -130,17 +130,19 @@ async def reset_all_data(
     from src.models.vulnerability import Vulnerability
     from src.models.scan import Scan
     from src.models.job import Job
-    from src.models.audit_log import AuditLog
     from src.models.notification_channel import NotificationChannel
     from src.models.scenario import Scenario
     from sqlalchemy import delete
 
-    for model in [
+    # AuditLog is intentionally excluded — it is append-only with no retention limit.
+    tables_to_clear = [
         VulnerabilityImpact, AssessmentResult, PostureFinding, Report,
-        Vulnerability, Scan, Job, AuditLog, NotificationChannel, Scenario,
-    ]:
+        Vulnerability, Scan, Job, NotificationChannel, Scenario,
+    ]
+    for model in tables_to_clear:
         await db.execute(delete(model))
     await db.commit()
+    tables = [m.__tablename__ for m in tables_to_clear]
 
     # Re-seed default scenarios
     try:

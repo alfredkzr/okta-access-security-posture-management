@@ -46,6 +46,7 @@ async def create_channel(
     db.add(channel)
     await db.flush()
     await db.refresh(channel)
+    await db.commit()
     return NotificationChannelResponse.from_model(channel)
 
 

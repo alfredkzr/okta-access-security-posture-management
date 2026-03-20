@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Shield, AlertTriangle, Eye, XCircle } from 'lucide-react';
+import { Shield, AlertTriangle, Eye, XCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import api from '../lib/api';
 import type { PaginatedResponse, Vulnerability, VulnerabilityStats } from '../lib/api';
 import { severityColor, statusColor, riskScoreColor, formatDate, cn } from '../lib/utils';
@@ -13,6 +13,7 @@ export default function Vulnerabilities() {
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const [severityFilter, setSeverityFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [sort, setSort] = useState('-risk_score');
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['vulnerability-stats'],
@@ -23,12 +24,13 @@ export default function Vulnerabilities() {
   });
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['vulnerabilities', page, statusFilter, severityFilter, categoryFilter],
+    queryKey: ['vulnerabilities', page, statusFilter, severityFilter, categoryFilter, sort],
     queryFn: async () => {
       const params: Record<string, string | number> = { page, page_size: 20 };
       if (statusFilter) params.status = statusFilter;
       if (severityFilter) params.severity = severityFilter;
       if (categoryFilter) params.category = categoryFilter;
+      if (sort) params.sort = sort;
       const res = await api.get<PaginatedResponse<Vulnerability>>('/vulnerabilities', { params });
       return res.data;
     },
@@ -44,7 +46,7 @@ export default function Vulnerabilities() {
   const statCards = [
     { label: 'Total', value: stats?.total ?? 0, icon: Shield, color: 'text-gray-700 dark:text-gray-300', bg: 'bg-gray-50 dark:bg-gray-800' },
     { label: 'Active', value: stats?.active ?? 0, icon: AlertTriangle, color: 'text-red-700', bg: 'bg-red-50 dark:bg-red-900/20' },
-    { label: 'Closed', value: stats?.closed ?? 0, icon: XCircle, color: 'text-gray-700', bg: 'bg-gray-50 dark:bg-gray-800' },
+    { label: 'Closed', value: stats?.closed ?? 0, icon: XCircle, color: 'text-green-700', bg: 'bg-green-50 dark:bg-green-900/30' },
     { label: 'Acknowledged', value: stats?.acknowledged ?? 0, icon: Eye, color: 'text-blue-700', bg: 'bg-blue-50 dark:bg-blue-900/20' },
   ];
 
@@ -128,12 +130,12 @@ export default function Vulnerabilities() {
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Title</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Severity</th>
+                <SortHeader label="Severity" field="severity" sort={sort} onSort={(s) => { setSort(s); setPage(1); }} />
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Risk Score</th>
+                <SortHeader label="Risk Score" field="risk_score" sort={sort} onSort={(s) => { setSort(s); setPage(1); }} />
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Affected Users</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">App</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Detected</th>
+                <SortHeader label="Last Detected" field="last_detected" sort={sort} onSort={(s) => { setSort(s); setPage(1); }} />
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"></th>
               </tr>
             </thead>
@@ -202,5 +204,34 @@ export default function Vulnerabilities() {
         )}
       </div>
     </div>
+  );
+}
+
+function SortHeader({ label, field, sort, onSort }: { label: string; field: string; sort: string; onSort: (s: string) => void }) {
+  const isActive = sort === field || sort === `-${field}`;
+  const isDesc = sort === `-${field}`;
+
+  const handleClick = () => {
+    if (!isActive) {
+      onSort(`-${field}`);
+    } else if (isDesc) {
+      onSort(field);
+    } else {
+      onSort(`-${field}`);
+    }
+  };
+
+  return (
+    <th
+      className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+      onClick={handleClick}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {isActive ? (
+          isDesc ? <ArrowDown className="w-3 h-3" /> : <ArrowUp className="w-3 h-3" />
+        ) : null}
+      </span>
+    </th>
   );
 }

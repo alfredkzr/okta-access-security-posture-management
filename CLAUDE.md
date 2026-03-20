@@ -1,7 +1,7 @@
 # Build: Okta Access Security Posture Management (ASPM) Platform
 
 ## Overview
-Build a production-grade Okta ASPM platform. The system performs **dynamic policy simulation** — testing whether an Okta tenant's authentication policies actually enforce access controls under risky conditions — combined with **static posture checks** covering admin security and MFA gaps. It simulates access attempts via the Okta Policy Simulation API, flags cases where policies ALLOW access that should be DENIED, and provides risk-scored findings with AI-powered remediation guidance.
+Build a production-grade Okta ASPM platform. The system performs **dynamic policy simulation** — testing whether an Okta tenant's authentication policies actually enforce access controls under risky conditions — combined with **static posture checks** covering admin security and MFA gaps. It simulates access attempts via the Okta Policy Simulation API, flags cases where policies ALLOW access that should be DENIED, and provides risk-scored findings with remediation guidance.
 
 **Positioning:** "Penetration testing for identity policies." Unlike SSPM competitors that perform static configuration checks, this platform dynamically validates policy enforcement through simulation.
 
@@ -10,7 +10,6 @@ Build a production-grade Okta ASPM platform. The system performs **dynamic polic
 - **Frontend:** React + TypeScript + Vite + TailwindCSS + shadcn/ui
 - **Database:** PostgreSQL 17 (via SQLAlchemy async ORM + Alembic migrations)
 - **Task Queue:** SAQ (async-native Redis queue with built-in cron, progress tracking, and web dashboard)
-- **AI Integration:** LiteLLM (provider-agnostic — supports OpenAI, Azure OpenAI, Anthropic, Ollama, Bedrock, etc.)
 - **Auth:** OAuth2/OIDC via Okta
 - **Secrets:** Fernet encryption for Okta API tokens
 - **PDF Reports:** fpdf2 (pure Python, no system dependencies, supports HTML via `write_html()`)
@@ -20,7 +19,6 @@ Build a production-grade Okta ASPM platform. The system performs **dynamic polic
 
 ### Key design choices
 - **SAQ** over ARQ (unmaintained) / Celery (async friction): async-native, built-in cron/progress/web UI
-- **LiteLLM**: provider-agnostic LLM calls, retry/fallback built in
 - **Caddy**: zero-config TLS. **fpdf2**: pure Python PDF, no system deps
 - **PostgreSQL 17**: better JSON perf. **Python 3.13**: no-GIL build available
 
@@ -71,14 +69,12 @@ Add static posture checks — admin security and MFA posture only. These cover t
 - **Done when:** A scan produces posture findings alongside simulation results.
 
 ### Milestone 6: Reports
-Generate CSV, PDF, and AI summary reports from persisted data.
+Generate CSV, PDF, and JSON reports from persisted data.
 - `src/reports/csv_generator.py`
 - `src/reports/pdf_generator.py` — fpdf2 with `write_html()` for tables and formatting
 - `src/reports/json_generator.py`
-- `src/reports/ai_summary_builder.py` — LiteLLM integration
-- `src/core/llm.py` — Provider-agnostic LLM interface
 - `src/api/routes/reports.py`
-- **Done when:** You can generate and download CSV, PDF, and AI summary for any past scan.
+- **Done when:** You can generate and download CSV, PDF, and JSON reports for any past scan.
 
 ### Milestone 7: Frontend
 Build the React dashboard. (Frontend architecture defined in separate spec or discovered during development.)
@@ -128,7 +124,6 @@ aspm/
 │   │   ├── risk_scenarios.py
 │   │   ├── risk_scorer.py
 │   │   ├── log_analyzer.py
-│   │   ├── llm.py
 │   │   ├── notifier.py
 │   │   └── crypto.py
 │   ├── models/
@@ -154,7 +149,6 @@ aspm/
 │   │   ├── csv_generator.py
 │   │   ├── pdf_generator.py
 │   │   ├── json_generator.py
-│   │   └── ai_summary_builder.py
 │   ├── db.py
 │   └── config.py
 ├── frontend/
@@ -534,22 +528,6 @@ AssessmentResult {
 
 This table is the **source of truth** for all assessment data. Reports are generated from this table, not ephemeral data.
 
-## CORE LOGIC — AI-Powered Analysis (Provider-Agnostic)
-
-All LLM calls go through `src/core/llm.py` using LiteLLM. Provider is configured via `LLM_MODEL` env var (e.g., `azure/gpt-4o`, `anthropic/claude-sonnet-4-20250514`, `ollama/llama3`).
-
-### AI Summary Sections
-- EXECUTIVE SUMMARY
-- POLICY REMEDIATION PRIORITY (ranked by risk score)
-- ADMIN SECURITY POSTURE (from posture checks)
-- MFA STRENGTH ASSESSMENT
-- USER ACTIVITY ANALYSIS
-- APP ACCESS REVIEW
-- LOGIN PATTERN ANALYSIS
-- RECOMMENDED REMEDIATION STEPS (actionable Okta Admin Console instructions)
-
-AI summaries are stored in the `reports` table linked to the scan.
-
 ## CORE LOGIC — Report Generation
 
 Reports query `assessment_results`, `vulnerabilities`, and `posture_findings` tables. Any report can be regenerated at any time from persisted data.
@@ -559,7 +537,7 @@ Reports query `assessment_results`, `vulnerabilities`, and `posture_findings` ta
 Report {
   id: UUID
   scan_id: FK
-  report_type: enum(csv_full, csv_violations, csv_inactive, csv_posture, pdf, json, ai_summary)
+  report_type: enum(csv_full, csv_violations, csv_inactive, csv_posture, pdf, json)
   file_path: string (nullable)
   content: text (nullable)
   generated_at: datetime
@@ -632,7 +610,6 @@ ScanConfig {
   include_posture_checks: boolean = true
   max_workers: integer = 5
   api_delay: float = 0
-  generate_ai_summary: boolean = false
 }
 ```
 
@@ -704,7 +681,6 @@ Every API error returns:
 | `OKTA_UNREACHABLE` | 502 | Okta API failed after retries |
 | `OKTA_RATE_LIMITED` | 429 | Okta rate limit (E0000047) |
 | `OKTA_TOKEN_INVALID` | 502 | SSWS token invalid/revoked |
-| `LLM_UNAVAILABLE` | 502 | LLM provider failed |
 | `INTERNAL_ERROR` | 500 | Unhandled exception |
 
 ## RBAC (v1: two roles)
@@ -827,14 +803,6 @@ OKTA_ADMIN_GROUP=ASPM_Admins
 # Encryption
 ENCRYPTION_KEY=                 # Fernet key for API token encryption
 
-# LLM (provider-agnostic via LiteLLM)
-LLM_MODEL=azure/gpt-4o
-LLM_TEMPERATURE=0.1
-LLM_MAX_TOKENS=16384
-LLM_TIMEOUT=120
-AZURE_API_KEY=
-AZURE_API_BASE=
-
 # Database
 DATABASE_URL=postgresql+asyncpg://aspm:aspm@db:5432/aspm
 
@@ -851,14 +819,104 @@ RETENTION_DAYS=180
 ALLOWED_ORIGINS=http://localhost:5173
 ```
 
-## Docker Compose
-See `docker-compose.yml` (local dev) and `docker-compose.prod.yml` (production with Caddy TLS).
-Services: db (postgres:17), redis:7, backend (uvicorn), worker (SAQ), frontend (Vite), caddy (prod only).
+## Database Migrations (Alembic)
+
+All schema changes are managed by Alembic. **Never use inline SQL or `Base.metadata.create_all()` in application startup.**
+
+### Migration workflow
+```bash
+# Apply all pending migrations (run before starting the app)
+alembic upgrade head
+
+# Create a new migration after changing models
+alembic revision --autogenerate -m "description of change"
+
+# Rollback last migration
+alembic downgrade -1
+
+# View migration history
+alembic history
+```
+
+### Rules
+- **One migration per schema change.** Don't batch unrelated changes.
+- **Every migration must have a working `downgrade()`.** Test rollback before merging.
+- **Never edit a migration that has been applied to any environment.** Create a new migration instead.
+- **The `docker-entrypoint.sh` runs `alembic upgrade head` automatically** before starting the backend or worker. No manual migration step needed when using Docker.
+- **For fresh databases**, run the initial migration (`001_initial_schema`) which creates all tables and enums.
+- **Alembic reads `DATABASE_URL` from the environment.** The `alembic.ini` default is overridden at runtime by `alembic/env.py`.
+
+### Files
+```
+alembic.ini              # Alembic config (logging, script location)
+alembic/
+├── env.py               # Async engine setup, reads DATABASE_URL from env
+├── script.py.mako       # Template for new migrations
+└── versions/
+    └── 001_initial_schema.py   # Full schema: all 10 tables + enums + indexes
+```
+
+## Docker Architecture
+
+### Container design principles
+- **Multi-stage builds** for both backend and frontend to minimize image size and attack surface.
+- **Non-root users** in all containers. Backend runs as `aspm` user, frontend uses nginx's default non-root user.
+- **Health checks** on all containers for automatic restart on failure.
+- **`docker-entrypoint.sh`** runs Alembic migrations before starting the backend.
+
+### Development (`docker-compose.yml`)
+- Source code mounted as volumes for hot-reload.
+- Frontend uses Vite dev server (target: `dev`).
+- DB and Redis ports exposed to host for local tooling.
+- `restart: unless-stopped` on all services.
+
+### Production (`docker-compose.prod.yml`)
+Overlay on top of `docker-compose.yml`:
+- Frontend uses nginx serving static build (target: `production`).
+- **DB and Redis ports NOT exposed** — only accessible within the Docker network.
+- DB credentials from environment variables (not hardcoded).
+- Redis persistence enabled (`appendonly yes`).
+- Resource limits and reservations on all services.
+- Log rotation configured (`json-file` driver, max 100MB × 10 files).
+- Caddy reverse proxy with auto-TLS.
+
+### Caddy (reverse proxy)
+The `Caddyfile` includes:
+- **Security headers:** HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, CSP.
+- **JSON request logging** to stdout.
+- Server header removed (`-Server`).
+
+### Running
+```bash
+# Development
+docker compose up -d
+
+# Production
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
 
 ## Deployment
 Min spec: 2 vCPU, 4GB RAM, 40GB disk, Ubuntu 22.04+.
-Steps: clone → `.env.example` → `.env` → `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` → `alembic upgrade head` → point DNS (Caddy auto-TLS).
-DR: PostgreSQL WAL to S3 (RPO 15min), Redis ephemeral (re-queued), reports to S3/GCS, app tier stateless (auto-restart).
+
+### Steps
+1. Clone → copy `.env.example` → `.env` → fill in secrets
+2. Set `POSTGRES_PASSWORD` in `.env` (required in production)
+3. `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
+4. Migrations run automatically via `docker-entrypoint.sh`
+5. Point DNS to server → Caddy auto-provisions TLS
+
+### DR
+PostgreSQL WAL to S3 (RPO 15min), Redis ephemeral (re-queued), reports to S3/GCS, app tier stateless (auto-restart).
+
+### Production checklist
+- [ ] `POSTGRES_PASSWORD` set to a strong random value
+- [ ] `SECRET_KEY` and `ENCRYPTION_KEY` generated and set
+- [ ] `ALLOWED_ORIGINS` set to actual domain (never `*`)
+- [ ] `COOKIE_SECURE=true` (HTTPS only)
+- [ ] DB/Redis ports NOT exposed (handled by `docker-compose.prod.yml`)
+- [ ] Caddy `DOMAIN` env var set to actual domain
+- [ ] Backup strategy for PostgreSQL configured
+- [ ] Log aggregation configured (Caddy + backend output JSON to stdout)
 
 ## Roadmap (post v1 — do NOT build into v1)
 - **v1.1:** Additional posture modules, compliance mapping (NIST/CIS), scan diffing
@@ -870,8 +928,7 @@ DR: PostgreSQL WAL to S3 (RPO 15min), Redis ephemeral (re-queued), reports to S3
 1. **Policy simulation is the HEART of this system.** Build Milestone 1 first. Nothing else matters until this works.
 2. **Rate limiting is critical.** Exponential backoff + jitter + adaptive throttling is essential.
 3. **Vulnerability lifecycle must be idempotent.** Running a scan twice must not create duplicates.
-4. **AI analysis is a nice-to-have.** The system must work fully without AI.
-5. **All long-running operations are async.** SAQ tasks with progress tracking. Frontend uses SSE with polling fallback.
+4. **All long-running operations are async.** SAQ tasks with progress tracking. Frontend uses SSE with polling fallback.
 6. **Structured logging from day one.** structlog JSON. Every Okta API call: endpoint, user_id, app_id, status, duration_ms, retry_count.
 7. **Test with real PostgreSQL.** Mock Okta API for unit tests. Real DB via docker for integration tests.
 8. **Persist everything that matters.** Assessment results, posture findings, vulns, audit logs → PostgreSQL. Redis is ephemeral.
@@ -886,3 +943,6 @@ DR: PostgreSQL WAL to S3 (RPO 15min), Redis ephemeral (re-queued), reports to S3
 17. **DB is the source of truth for schedules.** SAQ loads from DB on startup, not static config.
 18. **scan_config validated by Pydantic.** Stored as JSON in DB, but the app layer enforces the schema.
 19. **Ship v1, then iterate.** Don't build v1.1/v2/v3 features into v1.
+20. **Schema changes via Alembic only.** Never use `Base.metadata.create_all()` or inline SQL in app startup. Create a migration file, test upgrade + downgrade, then deploy.
+21. **Docker containers run as non-root.** Backend as `aspm` user, frontend via nginx. Never run production containers as root.
+22. **Security headers via Caddy.** HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy. Do not rely on the application layer for transport security headers.

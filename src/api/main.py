@@ -1,3 +1,4 @@
+import sqlalchemy as sa
 import structlog
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -30,7 +31,7 @@ structlog.configure(
 )
 
 app = FastAPI(
-    title="Okta ASPM",
+    title="Access Security Posture Management",
     description="Access Security Posture Management Platform",
     version="0.1.0",
 )
@@ -67,53 +68,17 @@ app.include_router(reports.router)
 
 @app.on_event("startup")
 async def on_startup():
-    """Create database tables if they don't exist."""
+    """Verify database connectivity on startup.
+
+    Schema migrations are handled by Alembic (run `alembic upgrade head`
+    before starting the application). See alembic/ directory.
+    """
     from src.db import engine
-    from src.models.base import Base
-    import src.models  # noqa: F401
 
-    import sqlalchemy as sa
-
-    async with engine.begin() as conn:
-        # Create tables first (handles fresh DB)
-        await conn.run_sync(Base.metadata.create_all)
-
-        # Migrations for existing databases — guarded so they're safe on fresh DBs
-        # Add CLOSED to the vulnerabilitystatus enum if it doesn't exist yet
-        await conn.execute(
-            sa.text(
-                "DO $$ BEGIN "
-                "IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'vulnerabilitystatus') THEN "
-                "IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'CLOSED' "
-                "AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'vulnerabilitystatus')) THEN "
-                "ALTER TYPE vulnerabilitystatus ADD VALUE 'CLOSED'; "
-                "END IF; END IF; END $$;"
-            )
-        )
-        # Make scenarios.risk_level nullable for existing tables
-        await conn.execute(
-            sa.text(
-                "DO $$ BEGIN "
-                "ALTER TABLE scenarios ALTER COLUMN risk_level DROP NOT NULL; "
-                "EXCEPTION WHEN undefined_table THEN NULL; "
-                "END $$;"
-            )
-        )
-        # Add acknowledged_by column if it doesn't exist yet
-        await conn.execute(
-            sa.text(
-                "DO $$ BEGIN "
-                "ALTER TABLE vulnerabilities ADD COLUMN acknowledged_by VARCHAR(255); "
-                "EXCEPTION WHEN duplicate_column THEN NULL; WHEN undefined_table THEN NULL; "
-                "END $$;"
-            )
-        )
-        # Migrate any existing REMEDIATED vulnerabilities to CLOSED
-        await conn.execute(
-            sa.text(
-                "UPDATE vulnerabilities SET status = 'CLOSED' WHERE status = 'REMEDIATED'"
-            )
-        )
+    logger = structlog.get_logger("startup")
+    async with engine.connect() as conn:
+        await conn.execute(sa.text("SELECT 1"))
+    logger.info("database_connected")
 
 
 @app.get("/api/v1/health")

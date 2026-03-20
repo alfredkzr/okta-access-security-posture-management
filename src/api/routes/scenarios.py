@@ -50,6 +50,7 @@ async def create_scenario(
         details={"name": scenario.name},
         ip_address=ip,
     )
+    await db.commit()
 
     return scenario
 
@@ -105,6 +106,7 @@ async def update_scenario(
         details={"updated_fields": list(update_data.keys())},
         ip_address=ip,
     )
+    await db.commit()
 
     return scenario
 
@@ -132,6 +134,7 @@ async def delete_scenario(
         details={"name": scenario_name},
         ip_address=ip,
     )
+    await db.commit()
 
 
 @router.post("/import", response_model=list[ScenarioResponse], status_code=201)
@@ -155,6 +158,7 @@ async def import_scenarios(
         details={"count": len(created), "names": [s.name for s in created]},
         ip_address="unknown",
     )
+    await db.commit()
 
     return created
 

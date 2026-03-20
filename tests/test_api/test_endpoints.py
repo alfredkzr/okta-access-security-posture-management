@@ -20,8 +20,8 @@ from itsdangerous import URLSafeTimedSerializer
 # These tests hit a real running server at localhost:8000.
 # Start it with: uvicorn src.api.main:app --port 8000
 
-BASE_URL = "http://localhost:8000"
-SYNC_DSN = "postgresql://aspm:aspm@localhost:5432/aspm"
+BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:8000")
+SYNC_DSN = os.environ.get("TEST_DATABASE_URL", "postgresql://aspm:aspm@localhost:5432/aspm_test")
 
 # Must match the SECRET_KEY used by the running backend (read from .env directly)
 def _read_secret_key() -> str:
@@ -214,13 +214,41 @@ def _insert_posture_finding(cur, scan_id: uuid.UUID, **overrides) -> uuid.UUID:
         "INSERT INTO posture_findings "
         "(id, scan_id, check_category, check_name, severity, status, title, description, "
         "affected_resources, remediation_steps, risk_score, first_detected, last_detected, created_at) "
-        "VALUES (%s, %s, %s::checkcategory, %s, %s::findingseverity, %s::findingstatus, %s, %s, %s, %s, %s, %s, %s, NOW())",
+        "VALUES (%s, %s, %s::checkcategory, %s, %s::severity, %s::findingstatus, %s, %s, %s, %s, %s, %s, %s, NOW())",
         (str(finding_id), str(scan_id), defaults["check_category"], defaults["check_name"],
          defaults["severity"], defaults["status"], defaults["title"], defaults["description"],
          defaults["affected_resources"], defaults["remediation_steps"], defaults["risk_score"],
          defaults["first_detected"], defaults["last_detected"]),
     )
     return finding_id
+
+
+def _insert_impact(cur, vulnerability_id: uuid.UUID, scan_id: uuid.UUID, **overrides) -> uuid.UUID:
+    """Insert a vulnerability impact row and return its id."""
+    impact_id = overrides.pop("id", uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    defaults = dict(
+        user_id="test-user",
+        user_email="test@example.com",
+        user_name="Test User",
+        app_name="TestApp",
+        scenario_name="Test Scenario",
+        status="ACTIVE",
+        first_detected=now,
+        last_detected=now,
+    )
+    defaults.update(overrides)
+    cur.execute(
+        "INSERT INTO vulnerability_impacts "
+        "(id, vulnerability_id, scan_id, user_id, user_email, user_name, app_name, scenario_name, "
+        "status, first_detected, last_detected) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::impactstatus, %s, %s)",
+        (str(impact_id), str(vulnerability_id), str(scan_id),
+         defaults["user_id"], defaults["user_email"], defaults["user_name"],
+         defaults["app_name"], defaults["scenario_name"], defaults["status"],
+         defaults["first_detected"], defaults["last_detected"]),
+    )
+    return impact_id
 
 
 # ===========================================================================
@@ -363,8 +391,10 @@ class TestVulnerabilities:
         assert len(data2["items"]) == 1
 
     def test_list_vulnerabilities_filter_status(self, client, db):
-        _insert_vulnerability(db, title="Active", status="ACTIVE")
-        _insert_vulnerability(db, title="Remediated", status="REMEDIATED")
+        scan_id = _insert_scan(db)
+        vuln_id = _insert_vulnerability(db, title="Active", status="ACTIVE")
+        _insert_impact(db, vuln_id, scan_id)  # Prevent auto-reconcile to CLOSED
+        _insert_vulnerability(db, title="Closed", status="CLOSED")
 
         resp = client.get("/api/v1/vulnerabilities", params={"status": "ACTIVE"})
         data = resp.json()
@@ -419,12 +449,14 @@ class TestVulnerabilities:
         assert resp.status_code == 200
         assert resp.json()["status"] == "ACKNOWLEDGED"
 
-    def test_patch_vulnerability_remediated_sets_timestamp(self, client, db):
+    def test_patch_vulnerability_closed_sets_timestamp(self, client, db):
+        scan_id = _insert_scan(db)
         vuln_id = _insert_vulnerability(db, status="ACTIVE")
+        _insert_impact(db, vuln_id, scan_id)  # Keep ACTIVE through auto-reconcile
 
         resp = client.patch(
             f"/api/v1/vulnerabilities/{vuln_id}",
-            json={"status": "REMEDIATED"},
+            json={"status": "CLOSED"},
         )
         assert resp.status_code == 200
         assert resp.json()["remediated_at"] is not None
@@ -440,20 +472,22 @@ class TestVulnerabilities:
         assert resp.json()["error"]["code"] == "INVALID_STATUS"
 
     def test_get_vulnerability_stats(self, client, db):
-        _insert_vulnerability(db, status="ACTIVE", severity="HIGH")
-        _insert_vulnerability(db, status="ACTIVE", severity="MEDIUM")
-        _insert_vulnerability(db, status="REMEDIATED", severity="HIGH")
+        scan_id = _insert_scan(db)
+        vuln1 = _insert_vulnerability(db, status="ACTIVE", severity="HIGH")
+        _insert_impact(db, vuln1, scan_id, user_id="u1")  # Keep ACTIVE
+        vuln2 = _insert_vulnerability(db, status="ACTIVE", severity="MEDIUM")
+        _insert_impact(db, vuln2, scan_id, user_id="u2")  # Keep ACTIVE
+        _insert_vulnerability(db, status="CLOSED", severity="HIGH")
 
         resp = client.get("/api/v1/vulnerabilities/stats")
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 3
         assert data["active"] == 2
-        assert data["remediated"] == 1
+        assert data["closed"] == 1
         assert data["acknowledged"] == 0
         assert data["by_severity"]["HIGH"] == 2
         assert data["by_severity"]["MEDIUM"] == 1
-        assert data["by_category"]["auth_policy_violation"] == 3
 
     def test_get_vulnerability_not_found(self, client, db):
         fake_id = str(uuid.uuid4())
@@ -643,8 +677,9 @@ class TestAssessments:
 class TestDashboard:
     def test_summary(self, client, db):
         scan_id = _insert_scan(db)
-        _insert_vulnerability(db, status="ACTIVE", severity="HIGH")
-        _insert_vulnerability(db, status="REMEDIATED", severity="MEDIUM")
+        vuln_id = _insert_vulnerability(db, status="ACTIVE", severity="HIGH")
+        _insert_impact(db, vuln_id, scan_id)  # Keep ACTIVE through auto-reconcile
+        _insert_vulnerability(db, status="CLOSED", severity="MEDIUM")
         _insert_posture_finding(db, scan_id, severity="HIGH", status="OPEN")
 
         resp = client.get("/api/v1/dashboard/summary")
@@ -652,7 +687,7 @@ class TestDashboard:
         data = resp.json()
         assert data["total_vulnerabilities"] == 2
         assert data["active_vulnerabilities"] == 1
-        assert data["remediated_vulnerabilities"] == 1
+        assert data["closed_vulnerabilities"] == 1
         assert data["total_posture_findings"] == 1
         # Score: 100 - 10 (1 HIGH) = 90
         assert data["posture_score"] == 90
@@ -923,13 +958,13 @@ class TestNotifications:
         resp = client.post("/api/v1/notifications/channels", json=payload)
         assert resp.status_code == 422
 
-    def test_list_channels_viewer_allowed(self, viewer_client, db):
-        """Viewers can list channels."""
+    def test_list_channels_viewer_forbidden(self, viewer_client, db):
+        """Viewers cannot list channels (admin-only)."""
         resp = viewer_client.get("/api/v1/notifications/channels")
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
-    def test_create_channel_viewer_allowed(self, viewer_client, db):
-        """Any authenticated user can create channels (no RBAC)."""
+    def test_create_channel_viewer_forbidden(self, viewer_client, db):
+        """Viewers cannot create channels (admin-only)."""
         payload = {
             "name": "Viewer Channel",
             "channel_type": "webhook",
@@ -937,7 +972,7 @@ class TestNotifications:
             "events": ["scan_completed"],
         }
         resp = viewer_client.post("/api/v1/notifications/channels", json=payload)
-        assert resp.status_code == 201
+        assert resp.status_code == 403
 
     def test_list_channels_anon_unauthorized(self, anon_client, db):
         """Unauthenticated users get 401."""
@@ -1125,14 +1160,14 @@ class TestReports:
         db.execute(
             "INSERT INTO reports (id, scan_id, report_type, content, generated_at, created_at) "
             "VALUES (%s, %s, %s::reporttype, %s, NOW(), NOW())",
-            (str(report_id), str(scan_id), "AI_SUMMARY", "This is the AI summary content."),
+            (str(report_id), str(scan_id), "JSON", "This is the JSON report content."),
         )
 
         resp = client.get(f"/api/v1/reports/{report_id}/download")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["content"] == "This is the AI summary content."
-        assert data["report_type"] == "ai_summary"
+        assert data["content"] == "This is the JSON report content."
+        assert data["report_type"] == "json"
 
 
 # ===========================================================================
@@ -1197,3 +1232,115 @@ class TestErrorHandling:
         fake_id = str(uuid.uuid4())
         resp = client.delete(f"/api/v1/notifications/channels/{fake_id}")
         assert resp.status_code == 404
+
+
+# ===========================================================================
+# RBAC ENFORCEMENT
+# ===========================================================================
+
+class TestRBAC:
+    """Verify that admin-only endpoints reject viewer-role users with 403."""
+
+    def test_viewer_cannot_create_scenario(self, viewer_client, db):
+        resp = viewer_client.post("/api/v1/scenarios", json={
+            "name": "Test", "description": "Test", "is_active": True,
+            "risk_level": "MEDIUM", "device_platform": "WINDOWS",
+            "device_registered": False, "device_managed": False,
+        })
+        assert resp.status_code == 403
+
+    def test_viewer_cannot_update_scenario(self, viewer_client, db):
+        fake_id = str(uuid.uuid4())
+        resp = viewer_client.put(f"/api/v1/scenarios/{fake_id}", json={"name": "X"})
+        assert resp.status_code == 403
+
+    def test_viewer_cannot_delete_scenario(self, viewer_client, db):
+        fake_id = str(uuid.uuid4())
+        resp = viewer_client.delete(f"/api/v1/scenarios/{fake_id}")
+        assert resp.status_code == 403
+
+    def test_viewer_cannot_create_schedule(self, viewer_client, db):
+        resp = viewer_client.post("/api/v1/schedules", json={
+            "name": "Daily", "schedule_type": "cron",
+            "cron_expression": "0 2 * * *",
+            "scan_config": {"user_selection": "all"},
+        })
+        assert resp.status_code == 403
+
+    def test_viewer_cannot_update_tenant_config(self, viewer_client, db):
+        resp = viewer_client.put("/api/v1/settings/tenant", json={
+            "okta_org": "test-org",
+        })
+        assert resp.status_code == 403
+
+    def test_viewer_cannot_reset_data(self, viewer_client, db):
+        resp = viewer_client.post("/api/v1/settings/reset?confirm=RESET")
+        assert resp.status_code == 403
+
+    def test_viewer_cannot_patch_vulnerability(self, viewer_client, db):
+        fake_id = str(uuid.uuid4())
+        resp = viewer_client.patch(
+            f"/api/v1/vulnerabilities/{fake_id}",
+            json={"status": "ACKNOWLEDGED"},
+        )
+        assert resp.status_code == 403
+
+    def test_viewer_can_read_dashboard(self, viewer_client, db):
+        """Viewers should still be able to access read-only endpoints."""
+        resp = viewer_client.get("/api/v1/dashboard/summary")
+        assert resp.status_code == 200
+
+    def test_viewer_can_list_vulnerabilities(self, viewer_client, db):
+        resp = viewer_client.get("/api/v1/vulnerabilities")
+        assert resp.status_code == 200
+
+    def test_viewer_can_list_scenarios(self, viewer_client, db):
+        resp = viewer_client.get("/api/v1/scenarios")
+        assert resp.status_code == 200
+
+    def test_viewer_can_get_tenant_config(self, viewer_client, db):
+        resp = viewer_client.get("/api/v1/settings/tenant")
+        assert resp.status_code == 200
+
+
+# ===========================================================================
+# WEBHOOK SSRF PREVENTION
+# ===========================================================================
+
+class TestWebhookSSRF:
+    """Verify that webhook URL validation blocks internal/private targets."""
+
+    def test_block_localhost_ip(self, client, db):
+        resp = client.post("/api/v1/notifications/channels", json={
+            "name": "SSRF Test", "webhook_url": "http://127.0.0.1:8080/hook",
+            "events": ["scan_completed"],
+        })
+        assert resp.status_code == 422
+
+    def test_block_private_ip(self, client, db):
+        resp = client.post("/api/v1/notifications/channels", json={
+            "name": "SSRF Test", "webhook_url": "http://10.0.0.1/hook",
+            "events": ["scan_completed"],
+        })
+        assert resp.status_code == 422
+
+    def test_block_link_local(self, client, db):
+        resp = client.post("/api/v1/notifications/channels", json={
+            "name": "SSRF Test", "webhook_url": "http://169.254.169.254/latest/meta-data/",
+            "events": ["scan_completed"],
+        })
+        assert resp.status_code == 422
+
+    def test_block_localhost_hostname(self, client, db):
+        resp = client.post("/api/v1/notifications/channels", json={
+            "name": "SSRF Test", "webhook_url": "http://localhost:6379/",
+            "events": ["scan_completed"],
+        })
+        assert resp.status_code == 422
+
+    def test_allow_public_url(self, client, db):
+        resp = client.post("/api/v1/notifications/channels", json={
+            "name": "Public Hook", "webhook_url": "https://hooks.slack.com/services/test",
+            "events": ["scan_completed"],
+        })
+        assert resp.status_code == 201

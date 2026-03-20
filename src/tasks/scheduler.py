@@ -92,6 +92,7 @@ async def check_scheduled_jobs(ctx: dict) -> None:
                     error=str(exc),
                 )
 
+        # Commit any remaining changes (stale scan cleanup, etc.)
         await db_session.commit()
         if enqueued_count > 0:
             logger.info("scheduler_enqueued_jobs", count=enqueued_count)
@@ -146,7 +147,18 @@ async def _enqueue_job(job: Job, now: datetime, db_session: AsyncSession) -> Non
         total_users=0,
     )
     db_session.add(scan)
-    await db_session.flush()
+
+    # Update the job's last_run_at and compute next_run_at
+    job.last_run_at = now
+    job.next_run_at = _compute_next_run(job, now)
+
+    # For one-time jobs, deactivate after enqueue
+    if job.schedule_type == ScheduleType.ONCE:
+        job.is_active = False
+
+    # Commit before enqueuing so the worker can find the Scan record
+    # when it picks up the task (it uses a separate DB session).
+    await db_session.commit()
 
     scan_config = job.scan_config or {}
 
@@ -161,12 +173,15 @@ async def _enqueue_job(job: Job, now: datetime, db_session: AsyncSession) -> Non
             heartbeat=600,
             retries=0,
         )
+    except Exception:
+        # Enqueue failed — mark the scan as FAILED so it doesn't block
+        # future scheduled runs for this job.
+        scan.status = ScanStatus.FAILED
+        scan.error_message = "Failed to enqueue scan task"
+        await db_session.commit()
+        raise
     finally:
         await queue.disconnect()
-
-    # Update the job's last_run_at and compute next_run_at
-    job.last_run_at = now
-    job.next_run_at = _compute_next_run(job, now)
 
     logger.info(
         "scheduled_job_enqueued",
@@ -175,10 +190,6 @@ async def _enqueue_job(job: Job, now: datetime, db_session: AsyncSession) -> Non
         scan_id=str(scan.id),
         next_run_at=job.next_run_at.isoformat() if job.next_run_at else None,
     )
-
-    # For one-time jobs, deactivate after enqueue
-    if job.schedule_type == ScheduleType.ONCE:
-        job.is_active = False
 
 
 def _compute_next_run(job: Job, now: datetime) -> datetime | None:

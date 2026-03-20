@@ -1,4 +1,5 @@
 import ipaddress
+import socket
 import uuid
 from datetime import datetime
 from urllib.parse import urlparse
@@ -6,22 +7,59 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, field_validator
 
 
+# Hostnames that should never be used as webhook targets
+_BLOCKED_HOSTNAMES = frozenset({
+    "localhost",
+    "metadata.google.internal",
+})
+
+
+def _is_private_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Check if an IP address is private, loopback, link-local, or reserved."""
+    return ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+
+
 def _validate_webhook_url(url: str) -> str:
-    """Validate webhook URL is not targeting internal/private networks (SSRF prevention)."""
+    """Validate webhook URL is not targeting internal/private networks (SSRF prevention).
+
+    Resolves hostnames to IP addresses at validation time to prevent bypasses
+    via internal DNS names (e.g. 'redis', 'db', 'metadata.google.internal').
+    """
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         raise ValueError(f"Webhook URL must use http or https, got: {parsed.scheme}")
     hostname = parsed.hostname
     if not hostname:
         raise ValueError("Webhook URL must have a hostname")
+
+    # Block well-known internal hostnames
+    if hostname.lower() in _BLOCKED_HOSTNAMES:
+        raise ValueError(f"Webhook URL cannot target internal hostname: {hostname}")
+
+    # Check if it's a raw IP address first
     try:
         ip = ipaddress.ip_address(hostname)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+        if _is_private_ip(ip):
             raise ValueError(f"Webhook URL cannot target private/internal address: {ip}")
+        return url
     except ValueError as exc:
         if "does not appear to be" not in str(exc):
             raise
-        # It's a hostname, not an IP — allow it (DNS resolves at request time)
+        # It's a hostname — resolve it and check the resulting IPs
+
+    # Resolve hostname to IP addresses and verify none are private/internal
+    try:
+        addrinfo = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+    except socket.gaierror:
+        raise ValueError(f"Webhook URL hostname could not be resolved: {hostname}")
+
+    for family, _type, _proto, _canonname, sockaddr in addrinfo:
+        ip = ipaddress.ip_address(sockaddr[0])
+        if _is_private_ip(ip):
+            raise ValueError(
+                f"Webhook URL hostname '{hostname}' resolves to private/internal address: {ip}"
+            )
+
     return url
 
 

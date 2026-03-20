@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
-import { AlertTriangle, CheckCircle, Users, ExternalLink } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Users, ExternalLink, X } from 'lucide-react';
 import api from '../lib/api';
 import type { DashboardSummary, PaginatedResponse, Vulnerability } from '../lib/api';
 import { severityColor, statusColor, riskScoreColor, timeAgo, cn } from '../lib/utils';
@@ -12,6 +12,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [scanEmail, setScanEmail] = useState('');
   const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
+  const [showAppsModal, setShowAppsModal] = useState(false);
 
   const { data: summary, isLoading, error } = useQuery<DashboardSummary>({
     queryKey: ['dashboard-summary'],
@@ -21,6 +22,12 @@ export default function Dashboard() {
   const { data: topVulns, isLoading: vulnsLoading } = useQuery<PaginatedResponse<Vulnerability>>({
     queryKey: ['top-vulnerabilities'],
     queryFn: () => api.get('/vulnerabilities', { params: { status: 'ACTIVE', sort: '-risk_score', page: 1, page_size: 5 } }).then(r => r.data),
+  });
+
+  const { data: coverageApps, isLoading: appsLoading } = useQuery<{ app_id: string; app_name: string; user_count: number }[]>({
+    queryKey: ['coverage-apps'],
+    queryFn: () => api.get('/dashboard/coverage/apps').then(r => r.data),
+    enabled: showAppsModal,
   });
 
   const scanMutation = useMutation({
@@ -88,12 +95,15 @@ export default function Dashboard() {
             <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Remediated</p>
             <CheckCircle className="w-5 h-5 text-green-400" />
           </div>
-          <p className="text-4xl font-bold text-green-600 dark:text-green-400 mt-2">{summary?.remediated_vulnerabilities ?? 0}</p>
+          <p className="text-4xl font-bold text-green-600 dark:text-green-400 mt-2">{summary?.closed_vulnerabilities ?? 0}</p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">resolved findings</p>
         </div>
 
         {/* Users & Apps Scanned */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+        <button
+          onClick={() => setShowAppsModal(true)}
+          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 text-left hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+        >
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Coverage</p>
             <Users className="w-5 h-5 text-blue-400" />
@@ -109,7 +119,7 @@ export default function Dashboard() {
               <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">apps</span>
             </div>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Row 2: Severity Distribution Bar */}
@@ -253,6 +263,44 @@ export default function Dashboard() {
       {/* Scan Detail Modal */}
       {selectedScanId && (
         <ScanDetailModal scanId={selectedScanId} onClose={() => setSelectedScanId(null)} />
+      )}
+
+      {/* Coverage Apps Modal */}
+      {showAppsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowAppsModal(false)}>
+          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 w-full max-w-lg mx-4 max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Scanned Applications ({coverageApps?.length ?? 0})</h2>
+              <button onClick={() => setShowAppsModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {appsLoading ? (
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400 text-sm">Loading...</div>
+              ) : !coverageApps?.length ? (
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400 text-sm">No apps found.</div>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Application</th>
+                      <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Users</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {coverageApps.map(app => (
+                      <tr key={app.app_id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                        <td className="px-6 py-3 text-sm text-gray-900 dark:text-gray-100">{app.app_name}</td>
+                        <td className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400 text-right">{app.user_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

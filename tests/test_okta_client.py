@@ -104,10 +104,10 @@ class TestSuccessfulCalls:
 
     @pytest.mark.asyncio
     async def test_get_user_by_login(self):
-        users = [{"id": "u1", "profile": {"login": "alice@example.com"}}]
+        user = {"id": "u1", "profile": {"login": "alice@example.com"}}
 
         def handler(request: httpx.Request) -> httpx.Response:
-            return _json_response(users)
+            return _json_response(user)
 
         client = _client_with_transport(httpx.MockTransport(handler))
         try:
@@ -120,7 +120,7 @@ class TestSuccessfulCalls:
     @pytest.mark.asyncio
     async def test_get_user_by_login_not_found(self):
         def handler(request: httpx.Request) -> httpx.Response:
-            return _json_response([])
+            return httpx.Response(404, json={"errorCode": "E0000007", "errorSummary": "Not found"})
 
         client = _client_with_transport(httpx.MockTransport(handler))
         try:
@@ -316,7 +316,7 @@ class TestRetryLogic:
 class TestRateLimiting:
     @pytest.mark.asyncio
     async def test_429_e0000047_raises_rate_limit_error(self):
-        """HTTP 429 with E0000047 should raise OktaRateLimitError immediately."""
+        """HTTP 429 with E0000047 should raise OktaRateLimitError after one retry."""
         call_count = 0
 
         def handler(request: httpx.Request) -> httpx.Response:
@@ -328,7 +328,7 @@ class TestRateLimiting:
         try:
             with pytest.raises(OktaRateLimitError):
                 await client.get_org_info()
-            assert call_count == 1  # No retries
+            assert call_count == 2  # One retry after respecting the reset window
         finally:
             await client.close()
 

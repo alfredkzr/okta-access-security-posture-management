@@ -112,6 +112,7 @@ async def create_schedule(
         details={"name": job.name, "schedule_type": body.schedule_type},
         ip_address=ip,
     )
+    await db.commit()
 
     return job
 
@@ -210,5 +211,6 @@ async def run_schedule_now(
         logger.error("run_now_enqueue_failed", job_id=str(job.id), error=str(exc))
         scan.status = ScanStatus.FAILED
         scan.error_message = f"Failed to enqueue: {exc}"[:1000]
+        await db.commit()
 
     return {"scan_id": str(scan.id), "message": "Scan enqueued"}

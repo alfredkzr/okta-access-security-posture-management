@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { X, Clock, Users, CheckCircle, XCircle, AlertTriangle, Loader } from 'lucide-react';
+import { X, Clock, CheckCircle, XCircle, AlertTriangle, Loader } from 'lucide-react';
 import api from '../lib/api';
 import type { Scan } from '../lib/api';
 import { formatDate, formatDuration, statusColor, cn } from '../lib/utils';
@@ -168,7 +168,7 @@ export default function ScanDetailModal({ scanId, onClose }: Props) {
 function MetaItem({ label, value, icon, mono }: { label: string; value: string; icon?: React.ReactNode; mono?: boolean }) {
   return (
     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-3">
-      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">{label}</p>
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-300 mb-0.5">{label}</p>
       <div className="flex items-center gap-2">
         {icon}
         <p className={cn('text-sm font-medium text-gray-900 dark:text-gray-100', mono && 'font-mono')}>{value}</p>
@@ -181,7 +181,7 @@ function CountCard({ label, count, color }: { label: string; count: number; colo
   return (
     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-3 text-center">
       <p className={cn('text-2xl font-bold', color)}>{count}</p>
-      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">{label}</p>
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-300 mt-0.5">{label}</p>
     </div>
   );
 }

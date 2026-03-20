@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Shield, ClipboardList, FileText, Settings, LogOut, User, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Shield, ClipboardList, FileText, Settings, LogOut, User, Sun, Moon, ExternalLink } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
@@ -28,10 +28,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <div>
               <h1 className="text-sm font-bold text-gray-900 dark:text-gray-100 tracking-tight leading-tight">
-                Okta Access
+                Access Security
               </h1>
               <p className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider leading-tight">
-                Security Posture
+                Posture Management
               </p>
             </div>
           </Link>
@@ -83,6 +83,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         )}
+
+        {/* Watermark */}
+        <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-800">
+          <a
+            href="https://github.com/alfredkzr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-[10px] text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+          >
+            Built by Alfred Koh
+            <ExternalLink className="w-2.5 h-2.5" />
+          </a>
+        </div>
       </aside>
       <main className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">
         <div className="p-8">{children}</div>

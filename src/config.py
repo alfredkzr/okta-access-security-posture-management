@@ -13,7 +13,6 @@ class Settings(BaseSettings):
     okta_client_secret: str = ""
     okta_issuer: str = ""
     okta_admin_group: str = "ASPM_Admins"
-
     # Encryption
     encryption_key: str = ""
 

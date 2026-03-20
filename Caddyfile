@@ -1,8 +1,30 @@
+{
+    # Caddy global options
+    log {
+        output stdout
+        format json
+        level INFO
+    }
+}
+
 {$DOMAIN:localhost} {
+    # Security headers applied to all responses
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'"
+        -Server
+    }
+
+    # API routes — proxy to backend
     handle /api/* {
         reverse_proxy backend:8000
     }
 
+    # Frontend — proxy to nginx (production) or vite (dev)
     handle {
         reverse_proxy frontend:80
     }

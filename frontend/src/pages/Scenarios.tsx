@@ -50,16 +50,6 @@ const emptyForm: ScenarioForm = {
   is_active: true,
 };
 
-const DEFAULT_SCENARIOS: Omit<ScenarioForm, 'is_active' | 'network_mode'>[] = [
-  { name: 'Personal Windows', description: 'Simulates access from an unregistered, unmanaged Windows device.', risk_level: '', device_platform: 'WINDOWS', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
-  { name: 'Personal macOS', description: 'Simulates access from an unregistered, unmanaged macOS device.', risk_level: '', device_platform: 'MACOS', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
-  { name: 'Personal ChromeOS', description: 'Simulates access from an unregistered, unmanaged ChromeOS device.', risk_level: '', device_platform: 'CHROMEOS', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
-  { name: 'Personal Android', description: 'Simulates access from an unregistered, unmanaged Android device.', risk_level: '', device_platform: 'ANDROID', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
-  { name: 'Personal iOS', description: 'Simulates access from an unregistered, unmanaged iOS device.', risk_level: '', device_platform: 'IOS', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
-  { name: 'Unknown Desktop', description: 'Simulates access from an unknown desktop device.', risk_level: '', device_platform: 'DESKTOP_OTHER', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
-  { name: 'Unknown Mobile', description: 'Simulates access from an unknown mobile device.', risk_level: '', device_platform: 'MOBILE_OTHER', device_registered: false, device_managed: false, device_assurance_id: '', ip_address: '', zone_ids: '' },
-];
-
 /** Convert form state to API payload */
 function formToPayload(form: ScenarioForm) {
   return {

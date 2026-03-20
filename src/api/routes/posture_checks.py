@@ -142,4 +142,5 @@ async def update_finding_status(
 
     await db.flush()
     await db.refresh(finding)
+    await db.commit()
     return finding

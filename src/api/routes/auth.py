@@ -89,7 +89,7 @@ async def auth_callback(request: Request):
         )
 
     groups = userinfo.get("groups", [])
-    role = "admin"
+    role = "admin" if settings.okta_admin_group in groups else "viewer"
 
     user_data = {
         "sub": userinfo.get("sub"),

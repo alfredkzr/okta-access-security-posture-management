@@ -89,6 +89,7 @@ async def run_tenant_scan(ctx: dict, *, scan_id: str, scan_config: dict) -> dict
                     max_workers=config.max_workers,
                     api_delay=config.api_delay,
                     saq_job=job,
+                    session_factory=session_factory,
                 )
 
                 await db_session.commit()

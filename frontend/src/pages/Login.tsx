@@ -12,8 +12,8 @@ export default function Login() {
             <Shield className="w-8 h-8 text-white" />
           </div>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">Okta Access</h1>
-        <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-8">Security Posture Management</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">Access Security</h1>
+        <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-8">Posture Management</p>
         <button
           onClick={login}
           className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all text-sm shadow-sm"

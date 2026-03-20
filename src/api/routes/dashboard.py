@@ -60,17 +60,15 @@ async def get_dashboard_summary(
 
     total_posture = (await db.execute(select(func.count(PostureFinding.id)))).scalar() or 0
 
-    # Users scanned — use the latest completed scan's successful_users count
-    # (not distinct assessment_result rows, which misses users with zero apps)
-    latest_scan_stmt = (
-        select(Scan.successful_users)
+    # Users scanned — use the highest total_users from any completed scan
+    # (this reflects the actual Okta tenant user count, not just users with assessment results)
+    users_scanned_stmt = (
+        select(func.max(Scan.total_users))
         .where(Scan.status.in_([ScanStatus.COMPLETED, ScanStatus.COMPLETED_WITH_ERRORS]))
-        .order_by(Scan.started_at.desc())
-        .limit(1)
     )
-    users_scanned = (await db.execute(latest_scan_stmt)).scalar() or 0
+    users_scanned = (await db.execute(users_scanned_stmt)).scalar() or 0
 
-    # Apps scanned
+    # Apps scanned — count distinct apps across all assessment results
     apps_scanned_stmt = select(func.count(func.distinct(AssessmentResult.app_id)))
     apps_scanned = (await db.execute(apps_scanned_stmt)).scalar() or 0
 
@@ -116,6 +114,28 @@ async def get_dashboard_summary(
         recent_scans=recent_scans,
         okta_health={"status": "unknown", "message": "Real-time health check not yet connected"},
     )
+
+
+@router.get("/coverage/apps")
+async def get_coverage_apps(
+    current_user: dict = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return distinct apps seen across all assessment results."""
+    stmt = (
+        select(
+            AssessmentResult.app_id,
+            AssessmentResult.app_name,
+            func.count(func.distinct(AssessmentResult.user_id)).label("user_count"),
+        )
+        .group_by(AssessmentResult.app_id, AssessmentResult.app_name)
+        .order_by(AssessmentResult.app_name)
+    )
+    result = await db.execute(stmt)
+    return [
+        {"app_id": row[0], "app_name": row[1], "user_count": row[2]}
+        for row in result.all()
+    ]
 
 
 @router.get("/trends", response_model=DashboardTrendsResponse)

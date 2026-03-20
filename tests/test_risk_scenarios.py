@@ -132,8 +132,8 @@ class TestDeepCopy:
 
 
 class TestDefaultScenarios:
-    def test_exactly_six_scenarios(self):
-        assert len(DEFAULT_SCENARIOS) == 6
+    def test_exactly_seven_scenarios(self):
+        assert len(DEFAULT_SCENARIOS) == 7
 
     def test_all_active(self):
         for s in DEFAULT_SCENARIOS:
@@ -153,13 +153,13 @@ class TestDefaultScenarios:
             DevicePlatform.ANDROID,
             DevicePlatform.IOS,
             DevicePlatform.DESKTOP_OTHER,
+            DevicePlatform.MOBILE_OTHER,
         }
 
     def test_risk_levels(self):
-        """First 5 should be MEDIUM, last one HIGH."""
-        levels = [s.risk_level for s in DEFAULT_SCENARIOS]
-        assert levels[:5] == [RiskLevel.MEDIUM] * 5
-        assert levels[5] == RiskLevel.HIGH
+        """Default scenarios do not set a risk_level (device-only simulation)."""
+        for s in DEFAULT_SCENARIOS:
+            assert s.risk_level is None, f"Scenario '{s.name}' should have risk_level=None"
 
     def test_no_ip_or_zones_on_defaults(self):
         for s in DEFAULT_SCENARIOS:

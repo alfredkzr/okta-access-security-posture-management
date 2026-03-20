@@ -86,9 +86,16 @@ async def _fetch_user_data(
 
     logger.info("assessment_started", user_email=user_email, user_id=user_id)
 
-    apps = await okta_client.get_user_apps(user_id)
+    all_apps = await okta_client.get_user_apps(user_id)
+    # Filter to only apps the user is actually assigned to (the Okta API
+    # returns all active apps with expand=user/{id}; unassigned users have
+    # _embedded.user.status != "ACTIVE" or no _embedded.user at all)
+    apps = [
+        app for app in all_apps
+        if app.get("_embedded", {}).get("user", {}).get("id") == user_id
+    ]
     data.apps = apps
-    logger.info("user_apps_fetched", user_email=user_email, app_count=len(apps))
+    logger.info("user_apps_fetched", user_email=user_email, app_count=len(apps), total_tenant_apps=len(all_apps))
 
     simulator = PolicySimulator(okta_client)
 
@@ -304,13 +311,18 @@ async def _persist_user_data(
                     "risk_score": score,
                 })
 
-            asyncio.create_task(notify("new_vulnerabilities", {
-                "scan_id": str(scan_id),
-                "user_email": user_email,
-                "count": new_violations_found,
-                "max_risk_score": max_risk_score,
-                "vulnerabilities": vuln_details,
-            }, db_session))
+            async def _fire_new_vuln_notification():
+                from src.db import async_session
+                async with async_session() as session:
+                    await notify("new_vulnerabilities", {
+                        "scan_id": str(scan_id),
+                        "user_email": user_email,
+                        "count": new_violations_found,
+                        "max_risk_score": max_risk_score,
+                        "vulnerabilities": vuln_details,
+                    }, session)
+
+            asyncio.create_task(_fire_new_vuln_notification())
         except Exception:
             logger.debug("vuln_notification_failed", user_email=user_email)
 
@@ -377,27 +389,40 @@ async def run_batch_scan(
     api_delay: float = 0,
     redis_client: Any | None = None,
     saq_job: Any | None = None,
+    session_factory: Any | None = None,
 ) -> dict[str, Any]:
     """Run batch assessment for multiple users.
 
     Users are assessed concurrently (up to max_workers at a time) for the
-    Okta API fetch phase.  DB writes are serialized through a single session
-    to avoid concurrency issues and vulnerability deduplication races.
+    Okta API fetch phase.  DB writes use a fresh session per user to avoid
+    asyncpg "another operation is in progress" errors.
 
     Args:
         scan_id: UUID of the scan record.
         user_list: List of user emails to assess.
         scenarios: Active scenarios to test against.
-        db_session: Async SQLAlchemy session.
+        db_session: Async SQLAlchemy session (used for scan progress only).
         okta_client: Configured OktaClient instance.
         max_workers: Max concurrent user assessments.
         api_delay: Delay in seconds between starting user assessments.
         redis_client: Optional Redis client for pub/sub progress updates.
         saq_job: Optional SAQ job for heartbeat updates.
+        session_factory: Async session factory for creating per-user sessions.
 
     Returns:
         Scan summary dict.
     """
+    # If no session_factory provided (e.g. tests), fall back to a context
+    # manager that just yields the existing db_session.
+    if session_factory is None:
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def _fallback_factory():
+            yield db_session
+
+        session_factory = _fallback_factory
+
     total_users = len(user_list)
 
     # Update scan record to running
@@ -458,7 +483,9 @@ async def run_batch_scan(
         fetch_started += 1
         tasks.append(asyncio.create_task(_fetch_worker(email)))
 
-    # Consume results as they arrive — persist sequentially on the single session
+    # Consume results as they arrive — each user gets a fresh DB session to
+    # prevent asyncpg "another operation is in progress" errors that occur
+    # when a single session's connection is shared across awaits.
     for _ in range(len(users_to_scan)):
         user_data = await queue.get()
 
@@ -475,16 +502,15 @@ async def run_batch_scan(
             )
         else:
             try:
-                await _persist_user_data(user_data, db_session, scan_id)
+                # Use a fresh session per user to isolate DB operations.
+                # This prevents concurrent asyncpg operations when background
+                # tasks (notifications) or eager relationship loading issue
+                # queries on the same connection.
+                async with session_factory() as user_session:
+                    await _persist_user_data(user_data, user_session, scan_id)
+                    await user_session.commit()
                 successful_users += 1
             except Exception as exc:
-                # Rollback the failed user's writes, then continue
-                await db_session.rollback()
-                # Re-fetch the scan object after rollback
-                scan_result = await db_session.execute(scan_stmt)
-                scan = scan_result.scalar_one_or_none()
-                if scan is None:
-                    raise ValueError(f"Scan not found after rollback: {scan_id}")
                 failed_users += 1
                 failed_user_details.append({
                     "email": user_data.email,
@@ -502,7 +528,7 @@ async def run_batch_scan(
             successful_users=successful_users, failed_users=failed_users,
             failed_user_details=failed_user_details,
         )
-        # Commit after each user so progress is visible and data is persisted
+        # Commit scan progress so frontend can see updates
         await db_session.commit()
 
     # Wait for all fetch tasks to complete (they should be done already since
@@ -510,7 +536,10 @@ async def run_batch_scan(
     await asyncio.gather(*tasks, return_exceptions=True)
 
     # Global reconciliation: sweep ALL vulnerabilities and fix any stale statuses.
-    await vulnerability_engine.reconcile_all_vulnerability_statuses(db_session)
+    # Use a fresh session to avoid sharing the scan-progress session.
+    async with session_factory() as recon_session:
+        await vulnerability_engine.reconcile_all_vulnerability_statuses(recon_session)
+        await recon_session.commit()
 
     # Finalize scan record
     now = datetime.now(timezone.utc)
@@ -544,46 +573,47 @@ async def run_batch_scan(
     }
     logger.info("batch_scan_completed", **summary)
 
-    # Fire notification (best-effort)
+    # Fire notification (best-effort) — uses its own session throughout
     try:
         from src.core.notifier import dispatch as notify
         from src.models.vulnerability import Vulnerability, VulnerabilityStatus
         from src.models.posture_finding import PostureFinding, FindingStatus
         from sqlalchemy import func as sa_func
 
-        # Query vulnerability counts for this scan's impacts
-        vuln_stmt = (
-            select(
-                sa_func.count().label("total"),
-                sa_func.count().filter(Vulnerability.severity.in_(["CRITICAL"])).label("critical"),
-                sa_func.count().filter(Vulnerability.severity.in_(["HIGH"])).label("high"),
+        async with session_factory() as notif_session:
+            # Query vulnerability counts
+            vuln_stmt = (
+                select(
+                    sa_func.count().label("total"),
+                    sa_func.count().filter(Vulnerability.severity.in_(["CRITICAL"])).label("critical"),
+                    sa_func.count().filter(Vulnerability.severity.in_(["HIGH"])).label("high"),
+                )
+                .where(Vulnerability.status == VulnerabilityStatus.ACTIVE)
             )
-            .where(Vulnerability.status == VulnerabilityStatus.ACTIVE)
-        )
-        vuln_row = (await db_session.execute(vuln_stmt)).one()
+            vuln_row = (await notif_session.execute(vuln_stmt)).one()
 
-        # Query posture findings count for this scan
-        posture_stmt = (
-            select(sa_func.count())
-            .where(PostureFinding.scan_id == scan_id)
-            .where(PostureFinding.status == FindingStatus.OPEN)
-        )
-        posture_count = (await db_session.execute(posture_stmt)).scalar() or 0
+            # Query posture findings count for this scan
+            posture_stmt = (
+                select(sa_func.count())
+                .where(PostureFinding.scan_id == scan_id)
+                .where(PostureFinding.status == FindingStatus.OPEN)
+            )
+            posture_count = (await notif_session.execute(posture_stmt)).scalar() or 0
 
-        asyncio.create_task(notify("scan_completed", {
-            "scan_id": str(scan_id),
-            "job_name": scan.job_name,
-            "status": scan.status.value,
-            "total_users": total_users,
-            "successful_users": successful_users,
-            "failed_users": failed_users,
-            "duration_seconds": scan.duration_seconds,
-            "started_at": scan.started_at.isoformat() if scan.started_at else None,
-            "vulnerabilities_found": vuln_row.total,
-            "critical_count": vuln_row.critical,
-            "high_count": vuln_row.high,
-            "posture_findings_count": posture_count,
-        }, db_session))
+            await notify("scan_completed", {
+                "scan_id": str(scan_id),
+                "job_name": scan.job_name,
+                "status": scan.status.value,
+                "total_users": total_users,
+                "successful_users": successful_users,
+                "failed_users": failed_users,
+                "duration_seconds": scan.duration_seconds,
+                "started_at": scan.started_at.isoformat() if scan.started_at else None,
+                "vulnerabilities_found": vuln_row.total,
+                "critical_count": vuln_row.critical,
+                "high_count": vuln_row.high,
+                "posture_findings_count": posture_count,
+            }, notif_session)
     except Exception:
         logger.debug("batch_scan_notification_failed", scan_id=str(scan_id))
 
