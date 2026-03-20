@@ -2,7 +2,7 @@
 
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-18+-61DAFB.svg)](https://react.dev)
+[![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 > Penetration testing for identity policies.
@@ -90,26 +90,24 @@ curl -X POST http://localhost:8000/api/v1/assessments/single \
 # Run a full tenant scan (background)
 curl -X POST http://localhost:8000/api/v1/assessments/batch \
   -H "Content-Type: application/json" \
-  -d '{"user_selection": "all", "include_posture_checks": true}'
+  -d '{"user_selection": "all"}'
 
 # View results
 curl http://localhost:8000/api/v1/dashboard/summary
 curl http://localhost:8000/api/v1/vulnerabilities?status=ACTIVE&severity=HIGH
-curl http://localhost:8000/api/v1/posture/score
 ```
 
 ## Project Structure
 
 ```
 src/
-├── api/routes/             # 50 FastAPI endpoints
+├── api/routes/             # FastAPI endpoints
 ├── core/
 │   ├── okta_client.py      # Okta API (retry, rate limiting, pagination)
 │   ├── policy_simulator.py # Policy simulation engine
 │   ├── assessment_engine.py
 │   ├── vulnerability_engine.py
-│   ├── risk_scorer.py
-│   └── posture_checks/     # Admin security + MFA modules
+│   └── risk_scorer.py
 ├── models/                 # SQLAlchemy ORM (10 models)
 ├── tasks/                  # Background jobs (scans, health, retention)
 └── reports/                # CSV, PDF, JSON generators
@@ -123,7 +121,6 @@ frontend/                   # React + TypeScript dashboard
 | `POST` | `/api/v1/assessments/single` | Single-user assessment |
 | `POST` | `/api/v1/assessments/batch` | Full tenant scan |
 | `GET` | `/api/v1/vulnerabilities` | List vulnerabilities (filterable) |
-| `GET` | `/api/v1/posture/findings` | Posture check results |
 | `GET` | `/api/v1/dashboard/summary` | Dashboard metrics |
 | `POST` | `/api/v1/reports/generate` | Generate report (CSV/PDF/JSON) |
 | `GET` | `/docs` | Interactive Swagger UI |
