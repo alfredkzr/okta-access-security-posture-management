@@ -13,7 +13,7 @@ dependencies = [
     "httpx>=0.27.0",
     "sqlalchemy[asyncio]>=2.0.30",
     "asyncpg>=0.29.0",
-    "alembic>=1.13.0",
+
     "saq[web]>=0.12.0",
     "redis>=5.0.0",
     "pydantic>=2.7.0",

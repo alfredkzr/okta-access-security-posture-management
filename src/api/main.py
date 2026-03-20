@@ -68,17 +68,15 @@ app.include_router(reports.router)
 
 @app.on_event("startup")
 async def on_startup():
-    """Verify database connectivity on startup.
-
-    Schema migrations are handled by Alembic (run `alembic upgrade head`
-    before starting the application). See alembic/ directory.
-    """
+    """Create database tables (if they don't exist) and verify connectivity."""
     from src.db import engine
+    from src.models.base import Base
+    import src.models  # noqa: F401 — registers all models with Base.metadata
 
     logger = structlog.get_logger("startup")
-    async with engine.connect() as conn:
-        await conn.execute(sa.text("SELECT 1"))
-    logger.info("database_connected")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("database_ready")
 
 
 @app.get("/api/v1/health")

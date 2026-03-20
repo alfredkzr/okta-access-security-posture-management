@@ -111,7 +111,7 @@ async def reset_all_data(
     """Delete ALL application data for a fresh start.
 
     Requires ``?confirm=RESET`` query parameter as a safety guard.
-    Clears every table except alembic_version.  Scenarios are re-seeded
+    Clears every table except audit_logs.  Scenarios are re-seeded
     with the built-in defaults after truncation.
     """
     if confirm != "RESET":
