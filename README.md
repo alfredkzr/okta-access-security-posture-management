@@ -11,6 +11,8 @@ A security platform that **dynamically simulates access attempts** against your 
 
 This is an open-source rebuild of a project I originally presented at [Oktane 2025 — Build Your Own Security Tools Using Okta and Auth0 APIs](https://www.okta.com/oktane/on-demand/2025/showcase-build-your-own-security-tools-using-okta-and-auth0-apis/).
 
+![Dashboard](docs/dashboard.png)
+
 ## Features
 
 - **Policy Simulation** — Tests user x app x scenario combinations against Okta's policy engine. Reports when access is allowed that should be denied.
