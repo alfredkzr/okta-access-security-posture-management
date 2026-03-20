@@ -45,10 +45,23 @@ cp .env.example .env
 Edit `.env` with your values:
 
 ```bash
+# Okta API (for scanning)
 OKTA_API_TOKEN=your-okta-api-token
 OKTA_ORG=your-org                   # e.g. dev-12345678
+OKTA_ORG_TYPE=okta                  # or oktapreview for dev/preview orgs
+
+# Okta OIDC (for dashboard login)
+# Create a "Web" app in Okta Admin > Applications > Create App Integration
+# Sign-in redirect URI:  http://localhost:8000/api/v1/auth/callback
+# Sign-out redirect URI: http://localhost:5173
+OKTA_CLIENT_ID=your-client-id
+OKTA_CLIENT_SECRET=your-client-secret
+OKTA_ISSUER=https://your-org.okta.com
+
+# App secrets
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
 ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+COOKIE_SECURE=false                 # set true in production (HTTPS)
 ```
 
 ### 2. Start
@@ -137,8 +150,13 @@ pytest
 |----------|----------|-------------|
 | `OKTA_API_TOKEN` | Yes | Okta SSWS API token |
 | `OKTA_ORG` | Yes | Okta org subdomain |
-| `SECRET_KEY` | Yes | App signing key |
+| `OKTA_ORG_TYPE` | No | `okta` (default) or `oktapreview` |
+| `OKTA_CLIENT_ID` | Yes | OIDC app client ID (for dashboard login) |
+| `OKTA_CLIENT_SECRET` | Yes | OIDC app client secret |
+| `OKTA_ISSUER` | Yes | Okta org URL, e.g. `https://dev-123.okta.com` |
+| `SECRET_KEY` | Yes | App session signing key |
 | `ENCRYPTION_KEY` | Yes | Fernet key for token encryption |
+| `COOKIE_SECURE` | No | `true` for HTTPS, `false` for local dev (default: `true`) |
 | `MAX_WORKERS` | No | Concurrent API workers (default: `5`) |
 | `RETENTION_DAYS` | No | Data retention period (default: `180`) |
 

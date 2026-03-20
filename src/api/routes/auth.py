@@ -65,7 +65,9 @@ async def login(request: Request):
     # Store a nonce in the session for CSRF protection
     nonce = secrets.token_urlsafe(32)
     request.session["oauth_nonce"] = nonce
-    return await oauth.okta.authorize_redirect(request, redirect_uri, nonce=nonce)
+    # prompt=login forces Okta to show the credentials page even if an
+    # Okta session already exists, ensuring a true sign-out / sign-in cycle.
+    return await oauth.okta.authorize_redirect(request, redirect_uri, nonce=nonce, prompt="login")
 
 
 @router.get("/callback")
@@ -88,15 +90,12 @@ async def auth_callback(request: Request):
             status_code=302,
         )
 
-    groups = userinfo.get("groups", [])
-    role = "admin" if settings.okta_admin_group in groups else "viewer"
-
     user_data = {
         "sub": userinfo.get("sub"),
         "email": userinfo.get("email"),
         "name": userinfo.get("name", userinfo.get("email", "Unknown")),
-        "role": role,
-        "groups": groups,
+        "role": "admin",
+        "groups": userinfo.get("groups", []),
         "authenticated_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -120,7 +119,11 @@ async def get_me(request: Request):
 
 @router.post("/logout")
 async def logout():
-    """Clear the session cookie."""
+    """Clear the session cookie.
+
+    The login endpoint uses ``prompt=login`` so the next sign-in always
+    shows the Okta credentials page even if an Okta session still exists.
+    """
     response = JSONResponse(content={"message": "Logged out"})
     response.delete_cookie(COOKIE_NAME, path="/")
     return response
