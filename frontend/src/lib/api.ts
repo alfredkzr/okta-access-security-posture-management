@@ -10,8 +10,11 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Session expired — redirect to login
-      window.location.href = '/';
+      // Don't redirect for the initial auth check — AuthProvider handles that
+      const url = error.config?.url || '';
+      if (!url.includes('/auth/me')) {
+        window.location.href = '/';
+      }
     }
     return Promise.reject(error);
   },
