@@ -5,6 +5,7 @@ import { Shield, AlertTriangle, Eye, XCircle, ArrowUp, ArrowDown } from 'lucide-
 import api from '../lib/api';
 import type { PaginatedResponse, Vulnerability, VulnerabilityStats } from '../lib/api';
 import { severityColor, statusColor, riskScoreColor, formatDate, cn } from '../lib/utils';
+import AppIcon from '../components/AppIcon';
 
 export default function Vulnerabilities() {
   const navigate = useNavigate();
@@ -44,43 +45,44 @@ export default function Vulnerabilities() {
   };
 
   const statCards = [
-    { label: 'Total', value: stats?.total ?? 0, icon: Shield, color: 'text-gray-700 dark:text-gray-300', bg: 'bg-gray-50 dark:bg-gray-800' },
-    { label: 'Active', value: stats?.active ?? 0, icon: AlertTriangle, color: 'text-red-700', bg: 'bg-red-50 dark:bg-red-900/20' },
-    { label: 'Closed', value: stats?.closed ?? 0, icon: XCircle, color: 'text-green-700', bg: 'bg-green-50 dark:bg-green-900/30' },
-    { label: 'Acknowledged', value: stats?.acknowledged ?? 0, icon: Eye, color: 'text-blue-700', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+    { label: 'Total', value: stats?.total ?? 0, icon: Shield, color: 'text-slate-300', iconColor: 'text-slate-400' },
+    { label: 'Active', value: stats?.active ?? 0, icon: AlertTriangle, color: 'text-red-400', iconColor: 'text-red-400' },
+    { label: 'Closed', value: stats?.closed ?? 0, icon: XCircle, color: 'text-emerald-400', iconColor: 'text-emerald-400' },
+    { label: 'Acknowledged', value: stats?.acknowledged ?? 0, icon: Eye, color: 'text-blue-400', iconColor: 'text-blue-400' },
   ];
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Vulnerabilities</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Security vulnerabilities detected across your Okta environment</p>
+        <h1 className="text-2xl font-bold text-text-primary">Vulnerabilities</h1>
+        <p className="text-sm text-text-secondary mt-1">Security vulnerabilities detected across your Okta environment</p>
       </div>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card) => (
-          <div key={card.label} className={cn('rounded-lg border border-gray-200 p-5', card.bg)}>
+          <div key={card.label} className="glass-panel p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{card.label}</p>
+                <p className="text-sm font-medium text-text-muted">{card.label}</p>
                 <p className={cn('text-2xl font-bold mt-1', card.color)}>
                   {statsLoading ? '...' : card.value}
                 </p>
               </div>
-              <card.icon className={cn('w-8 h-8 opacity-60', card.color)} />
+              <card.icon className={cn('w-8 h-8 opacity-50', card.iconColor)} />
             </div>
           </div>
         ))}
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-600">Filters:</span>
+      <div className="glass-panel p-4 flex flex-wrap items-center gap-3">
+        <span className="text-sm font-medium text-text-secondary">Filters:</span>
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-border-glass bg-white/[0.04] px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-colors"
         >
           <option value="">All Statuses</option>
           <option value="ACTIVE">Active</option>
@@ -90,7 +92,7 @@ export default function Vulnerabilities() {
         <select
           value={severityFilter}
           onChange={(e) => { setSeverityFilter(e.target.value); setPage(1); }}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-border-glass bg-white/[0.04] px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-colors"
         >
           <option value="">All Severities</option>
           <option value="CRITICAL">Critical</option>
@@ -101,7 +103,7 @@ export default function Vulnerabilities() {
         <select
           value={categoryFilter}
           onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-border-glass bg-white/[0.04] px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-colors"
         >
           <option value="">All Categories</option>
           <option value="auth_policy_violation">Auth Policy Violation</option>
@@ -110,7 +112,7 @@ export default function Vulnerabilities() {
         {(statusFilter || severityFilter || categoryFilter) && (
           <button
             onClick={resetFilters}
-            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium"
+            className="text-sm text-blue-400 hover:text-blue-300 font-medium transition-colors"
           >
             Clear filters
           </button>
@@ -118,35 +120,35 @@ export default function Vulnerabilities() {
       </div>
 
       {/* Table */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="glass-panel overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center text-gray-500 dark:text-gray-400">Loading vulnerabilities...</div>
+          <div className="p-12 text-center text-text-muted">Loading vulnerabilities...</div>
         ) : isError ? (
-          <div className="p-12 text-center text-red-500 dark:text-red-400">Failed to load vulnerabilities. Please try again.</div>
+          <div className="p-12 text-center text-red-400">Failed to load vulnerabilities. Please try again.</div>
         ) : !data?.items.length ? (
-          <div className="p-12 text-center text-gray-500 dark:text-gray-400">No vulnerabilities found matching your filters.</div>
+          <div className="p-12 text-center text-text-muted">No vulnerabilities found matching your filters.</div>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Title</th>
+              <tr className="border-b border-border-glass bg-white/[0.02]">
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-muted uppercase tracking-wider">Title</th>
                 <SortHeader label="Severity" field="severity" sort={sort} onSort={(s) => { setSort(s); setPage(1); }} />
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-muted uppercase tracking-wider">Status</th>
                 <SortHeader label="Risk Score" field="risk_score" sort={sort} onSort={(s) => { setSort(s); setPage(1); }} />
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Affected Users</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">App</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-muted uppercase tracking-wider">Affected Users</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-text-muted uppercase tracking-wider">App</th>
                 <SortHeader label="Last Detected" field="last_detected" sort={sort} onSort={(s) => { setSort(s); setPage(1); }} />
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"></th>
+                <th className="px-4 py-3 text-xs font-medium text-text-muted uppercase tracking-wider"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            <tbody>
               {data.items.map((vuln) => (
                 <tr
                   key={vuln.id}
                   onClick={() => navigate(`/vulnerabilities/${vuln.id}`)}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                  className="border-b border-border-glass hover:bg-white/[0.02] cursor-pointer transition-colors"
                 >
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 max-w-xs truncate">{vuln.title}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-text-primary max-w-xs truncate">{vuln.title}</td>
                   <td className="px-4 py-3">
                     <span className={cn('inline-block px-2 py-0.5 rounded-full text-xs font-medium border', severityColor(vuln.severity))}>
                       {vuln.severity}
@@ -160,13 +162,18 @@ export default function Vulnerabilities() {
                   <td className="px-4 py-3">
                     <span className={cn('text-sm font-bold', riskScoreColor(vuln.risk_score))}>{vuln.risk_score}</span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{vuln.active_impact_count}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-[160px] truncate">{vuln.app_name ?? '---'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{formatDate(vuln.last_detected)}</td>
+                  <td className="px-4 py-3 text-sm text-text-secondary">{vuln.active_impact_count}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <AppIcon appName={vuln.app_name} size="sm" />
+                      <span className="text-sm text-text-secondary truncate max-w-[130px]">{vuln.app_name ?? '---'}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-text-muted">{formatDate(vuln.last_detected)}</td>
                   <td className="px-4 py-3">
                     <Link
                       to={`/vulnerabilities/${vuln.id}`}
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                      className="text-sm text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors"
                       onClick={e => e.stopPropagation()}
                     >
                       View
@@ -180,22 +187,22 @@ export default function Vulnerabilities() {
 
         {/* Pagination */}
         {data && data.pages > 1 && (
-          <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-800 px-4 py-3 bg-gray-50 dark:bg-gray-800/50">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="flex items-center justify-between border-t border-border-glass px-4 py-3 bg-white/[0.02]">
+            <p className="text-sm text-text-muted">
               Page {data.page} of {data.pages} ({data.total} total)
             </p>
             <div className="flex gap-2">
               <button
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
-                className="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-border-glass bg-white/[0.04] text-text-secondary hover:bg-white/[0.08] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Previous
               </button>
               <button
                 disabled={page >= data.pages}
                 onClick={() => setPage((p) => p + 1)}
-                className="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-sm font-medium rounded-lg border border-border-glass bg-white/[0.04] text-text-secondary hover:bg-white/[0.08] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Next
               </button>
@@ -223,7 +230,7 @@ function SortHeader({ label, field, sort, onSort }: { label: string; field: stri
 
   return (
     <th
-      className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+      className="text-left px-4 py-3 text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer select-none hover:text-text-secondary transition-colors"
       onClick={handleClick}
     >
       <span className="inline-flex items-center gap-1">

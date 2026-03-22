@@ -133,12 +133,12 @@ export default function SettingsPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage configuration, schedules, and notifications</p>
+        <h1 className="text-2xl font-bold text-text-primary">Settings</h1>
+        <p className="text-sm text-text-secondary mt-1">Manage configuration, schedules, and notifications</p>
       </div>
 
       {/* Tab Buttons */}
-      <div className="flex gap-1 border-b border-gray-200 dark:border-gray-800 mb-6">
+      <div className="flex gap-1 border-b border-border-glass mb-6">
         {tabs.map(tab => (
           <button
             key={tab.id}
@@ -146,8 +146,8 @@ export default function SettingsPage() {
             className={cn(
               'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
               activeTab === tab.id
-                ? 'border-blue-600 text-blue-700 dark:text-blue-400'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-text-muted hover:text-text-secondary hover:border-border-glass-hover'
             )}
           >
             {tab.label}
@@ -189,34 +189,34 @@ function GeneralTab() {
   });
 
   if (tenantLoading) {
-    return <div className="flex items-center justify-center h-40"><div className="text-gray-500 dark:text-gray-400 text-sm">Loading settings...</div></div>;
+    return <div className="flex items-center justify-center h-40"><div className="text-text-muted text-sm">Loading settings...</div></div>;
   }
 
   if (tenantError) {
-    return <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4"><p className="text-red-700 dark:text-red-400 text-sm">Failed to load settings.</p></div>;
+    return <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4"><p className="text-red-400 text-sm">Failed to load settings.</p></div>;
   }
 
   return (
     <div className="space-y-6">
       {/* Okta Configuration */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Okta Configuration</h2>
+      <div className="glass-panel p-6">
+        <h2 className="text-sm font-semibold text-text-secondary mb-4">Okta Configuration</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Organization</label>
-            <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
+            <label className="block text-xs font-medium text-text-muted mb-1">Organization</label>
+            <div className="bg-white/[0.03] border border-border-glass rounded-lg px-3 py-2 text-sm text-text-primary">
               {tenant?.okta_org || '--'}
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Org Type</label>
-            <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100">
+            <label className="block text-xs font-medium text-text-muted mb-1">Org Type</label>
+            <div className="bg-white/[0.03] border border-border-glass rounded-lg px-3 py-2 text-sm text-text-primary">
               {tenant?.okta_org_type || '--'}
             </div>
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">API Token</label>
-            <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 font-mono">
+            <label className="block text-xs font-medium text-text-muted mb-1">API Token</label>
+            <div className="bg-white/[0.03] border border-border-glass rounded-lg px-3 py-2 text-sm text-text-primary font-mono">
               {tenant?.okta_api_token_masked || (tenant?.okta_api_token_set ? '****' : 'Not configured')}
             </div>
           </div>
@@ -225,12 +225,12 @@ function GeneralTab() {
           <button
             onClick={() => { setTestResult(null); testMutation.mutate(); }}
             disabled={testMutation.isPending}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {testMutation.isPending ? 'Testing...' : 'Test Okta Connection'}
           </button>
           {testResult && (
-            <span className={`text-sm ${testResult.success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            <span className={`text-sm ${testResult.success ? 'text-emerald-400' : 'text-red-400'}`}>
               {testResult.message}
             </span>
           )}
@@ -238,11 +238,11 @@ function GeneralTab() {
       </div>
 
       {/* System Health */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
+      <div className="glass-panel p-6">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2.5">
-            <Activity className="w-4 h-4 text-gray-400" />
-            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">System Health</h2>
+            <Activity className="w-4 h-4 text-text-muted" />
+            <h2 className="text-sm font-semibold text-text-secondary">System Health</h2>
           </div>
           {!healthLoading && health && (() => {
             const oktaStatus = typeof health.okta === 'string'
@@ -257,12 +257,12 @@ function GeneralTab() {
               <span className={cn(
                 'inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full',
                 allHealthy
-                  ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                  : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
+                  ? 'bg-emerald-500/15 text-emerald-400'
+                  : 'bg-amber-500/15 text-amber-400'
               )}>
                 <span className={cn(
                   'w-1.5 h-1.5 rounded-full',
-                  allHealthy ? 'bg-green-500 animate-pulse' : 'bg-amber-500 animate-pulse'
+                  allHealthy ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-pulse'
                 )} />
                 {allHealthy ? 'All Systems Operational' : 'Degraded'}
               </span>
@@ -272,12 +272,12 @@ function GeneralTab() {
         {healthLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[0, 1, 2].map(i => (
-              <div key={i} className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 animate-pulse">
+              <div key={i} className="border border-border-glass rounded-lg p-4 animate-pulse">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-gray-800" />
+                  <div className="w-9 h-9 rounded-lg bg-white/[0.05]" />
                   <div className="space-y-2 flex-1">
-                    <div className="h-3 w-16 bg-gray-100 dark:bg-gray-800 rounded" />
-                    <div className="h-2.5 w-20 bg-gray-100 dark:bg-gray-800 rounded" />
+                    <div className="h-3 w-16 bg-white/[0.05] rounded" />
+                    <div className="h-2.5 w-20 bg-white/[0.05] rounded" />
                   </div>
                 </div>
               </div>
@@ -301,7 +301,7 @@ function GeneralTab() {
             />
           </div>
         ) : (
-          <p className="text-sm text-gray-400 dark:text-gray-500">Health data unavailable</p>
+          <p className="text-sm text-text-muted">Health data unavailable</p>
         )}
       </div>
 
@@ -327,15 +327,15 @@ function DangerZone() {
   });
 
   return (
-    <div className="bg-white dark:bg-gray-900 border-2 border-red-200 dark:border-red-800 rounded-lg p-6">
+    <div className="glass-panel border-2 !border-red-500/20 p-6">
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-          <AlertTriangle className="w-5 h-5 text-red-600" />
+        <div className="mt-0.5 p-2 bg-red-500/15 rounded-lg">
+          <AlertTriangle className="w-5 h-5 text-red-400" />
         </div>
         <div className="flex-1">
-          <h2 className="text-sm font-semibold text-red-700 dark:text-red-400">Danger Zone</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Reset the entire application to a clean state. This permanently deletes <strong>all</strong> scan
+          <h2 className="text-sm font-semibold text-red-400">Danger Zone</h2>
+          <p className="text-sm text-text-secondary mt-1">
+            Reset the entire application to a clean state. This permanently deletes <strong className="text-text-primary">all</strong> scan
             results, vulnerabilities, posture findings, scheduled jobs, reports, notifications, and audit logs.
             Default scenarios will be re-created.
           </p>
@@ -343,18 +343,18 @@ function DangerZone() {
           {step === 'idle' && (
             <button
               onClick={() => setStep('confirm')}
-              className="mt-4 px-4 py-2 text-sm font-medium text-red-700 dark:text-red-400 bg-white border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              className="mt-4 px-4 py-2 text-sm font-medium text-red-400 bg-transparent border border-red-500/30 rounded-lg hover:bg-red-500/10 transition-colors"
             >
               Reset All Data
             </button>
           )}
 
           {step === 'confirm' && (
-            <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg space-y-3">
-              <p className="text-sm font-medium text-red-800 dark:text-red-300">
+            <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg space-y-3">
+              <p className="text-sm font-medium text-red-300">
                 Are you sure? This action cannot be undone.
               </p>
-              <p className="text-sm text-red-700 dark:text-red-400">
+              <p className="text-sm text-red-400">
                 All scan history, vulnerabilities, findings, scheduled jobs, and reports will be permanently deleted.
               </p>
               <div className="flex gap-2">
@@ -366,7 +366,7 @@ function DangerZone() {
                 </button>
                 <button
                   onClick={() => setStep('idle')}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-text-secondary bg-white/[0.03] border border-border-glass rounded-lg hover:text-text-primary hover:border-border-glass-hover transition-colors"
                 >
                   Cancel
                 </button>
@@ -375,9 +375,9 @@ function DangerZone() {
           )}
 
           {step === 'typing' && (
-            <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg space-y-3">
-              <p className="text-sm text-red-800 dark:text-red-300">
-                Type <code className="px-1.5 py-0.5 bg-red-100 dark:bg-red-800 rounded font-mono text-red-900 dark:text-red-200 font-bold">RESET</code> to confirm:
+            <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg space-y-3">
+              <p className="text-sm text-red-300">
+                Type <code className="px-1.5 py-0.5 bg-red-500/20 rounded font-mono text-red-200 font-bold">RESET</code> to confirm:
               </p>
               <div className="flex gap-2">
                 <input
@@ -385,7 +385,7 @@ function DangerZone() {
                   value={typed}
                   onChange={e => setTyped(e.target.value)}
                   placeholder="Type RESET"
-                  className="px-3 py-2 border border-red-300 dark:border-red-700 rounded-lg text-sm font-mono focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none w-40"
+                  className="px-3 py-2 bg-bg-input border border-red-500/30 rounded-lg text-sm font-mono text-text-primary focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 outline-none w-40"
                   autoFocus
                 />
                 <button
@@ -397,16 +397,16 @@ function DangerZone() {
                 </button>
                 <button
                   onClick={() => { setStep('idle'); setTyped(''); }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-text-secondary bg-white/[0.03] border border-border-glass rounded-lg hover:text-text-primary hover:border-border-glass-hover transition-colors"
                 >
                   Cancel
                 </button>
               </div>
               {resetMutation.isError && (
-                <p className="text-sm text-red-600">Reset failed. Please try again.</p>
+                <p className="text-sm text-red-400">Reset failed. Please try again.</p>
               )}
               {resetMutation.isSuccess && (
-                <p className="text-sm text-green-600 dark:text-green-400 font-medium">All data has been reset successfully.</p>
+                <p className="text-sm text-emerald-400 font-medium">All data has been reset successfully.</p>
               )}
             </div>
           )}
@@ -422,38 +422,38 @@ function HealthCard({ label, subtitle, status, icon: Icon }: { label: string; su
     <div className={cn(
       'border rounded-lg p-4 transition-colors',
       isHealthy
-        ? 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
-        : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10'
+        ? 'border-border-glass bg-white/[0.02]'
+        : 'border-red-500/20 bg-red-500/5'
     )}>
       <div className="flex items-center gap-3">
         <div className={cn(
           'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
           isHealthy
-            ? 'bg-green-50 dark:bg-green-900/20'
-            : 'bg-red-50 dark:bg-red-900/20'
+            ? 'bg-emerald-500/15'
+            : 'bg-red-500/15'
         )}>
           <Icon className={cn(
             'w-4.5 h-4.5',
-            isHealthy ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'
+            isHealthy ? 'text-emerald-400' : 'text-red-400'
           )} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{label}</span>
+            <span className="text-sm font-medium text-text-primary">{label}</span>
             <span className={cn(
               'inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full',
               isHealthy
-                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                ? 'bg-emerald-500/15 text-emerald-400'
+                : 'bg-red-500/15 text-red-400'
             )}>
               <span className={cn(
                 'w-1.5 h-1.5 rounded-full',
-                isHealthy ? 'bg-green-500' : 'bg-red-500'
+                isHealthy ? 'bg-emerald-500' : 'bg-red-500'
               )} />
               {isHealthy ? 'Healthy' : 'Down'}
             </span>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">{subtitle}</p>
+          <p className="text-xs text-text-muted mt-0.5">{subtitle}</p>
         </div>
       </div>
     </div>
@@ -589,21 +589,24 @@ function SchedulesTab() {
     return job.schedule_type;
   }
 
+  const inputClass = 'w-full px-3 py-2 bg-bg-input border border-border-glass rounded-lg text-sm text-text-primary focus:border-accent focus:ring-2 focus:ring-accent-glow outline-none';
+  const labelClass = 'block text-sm font-medium text-text-secondary mb-1';
+
   if (isLoading) {
-    return <div className="flex items-center justify-center h-40"><div className="text-gray-500 dark:text-gray-400">Loading schedules...</div></div>;
+    return <div className="flex items-center justify-center h-40"><div className="text-text-muted">Loading schedules...</div></div>;
   }
 
   if (error) {
-    return <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-700 dark:text-red-400">Failed to load schedules.</div>;
+    return <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-400">Failed to load schedules.</div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500 dark:text-gray-400">Manage automated scan schedules</p>
+        <p className="text-sm text-text-secondary">Manage automated scan schedules</p>
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-500"
         >
           <Plus className="w-4 h-4" />
           New Schedule
@@ -611,41 +614,41 @@ function SchedulesTab() {
       </div>
 
       {showForm && (
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        <div className="glass-panel p-6">
+          <h2 className="text-lg font-semibold text-text-primary mb-4">
             {editingId ? 'Edit Schedule' : 'New Schedule'}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+                <label className={labelClass}>Name</label>
                 <input
                   type="text"
                   required
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className={inputClass}
                   placeholder="Schedule name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                <label className={labelClass}>Description</label>
                 <input
                   type="text"
                   value={form.description}
                   onChange={e => setForm({ ...form, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className={inputClass}
                   placeholder="Optional description"
                 />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Schedule Type</label>
+                <label className={labelClass}>Schedule Type</label>
                 <select
                   value={form.schedule_type}
                   onChange={e => setForm({ ...form, schedule_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className={inputClass}
                 >
                   <option value="cron">Cron</option>
                   <option value="interval">Interval</option>
@@ -654,84 +657,84 @@ function SchedulesTab() {
               </div>
               {form.schedule_type === 'cron' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cron Expression</label>
+                  <label className={labelClass}>Cron Expression</label>
                   <input
                     type="text"
                     value={form.cron_expression}
                     onChange={e => setForm({ ...form, cron_expression: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className={cn(inputClass, 'font-mono')}
                     placeholder="0 0 * * *"
                   />
                 </div>
               )}
               {form.schedule_type === 'interval' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Interval (seconds)</label>
+                  <label className={labelClass}>Interval (seconds)</label>
                   <input
                     type="number"
                     min={60}
                     value={form.interval_seconds}
                     onChange={e => setForm({ ...form, interval_seconds: parseInt(e.target.value) || 3600 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className={inputClass}
                   />
                 </div>
               )}
               <div className="flex items-end">
-                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 dark:text-gray-600">
+                <label className="flex items-center gap-2 text-sm text-text-secondary">
                   <input
                     type="checkbox"
                     checked={form.is_active}
                     onChange={e => setForm({ ...form, is_active: e.target.checked })}
-                    className="rounded border-gray-300"
+                    className="rounded border-border-glass bg-bg-input"
                   />
                   Active
                 </label>
               </div>
             </div>
 
-            <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Scan Configuration</h3>
+            <div className="border-t border-border-glass pt-4">
+              <h3 className="text-sm font-medium text-text-primary mb-3">Scan Configuration</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">User Selection</label>
+                  <label className={labelClass}>User Selection</label>
                   <select
                     value={form.scan_config.user_selection}
                     onChange={e => setForm({ ...form, scan_config: { ...form.scan_config, user_selection: e.target.value } })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className={inputClass}
                   >
                     <option value="all">All Users</option>
                     <option value="specific">Specific Users</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Concurrent Workers</label>
+                  <label className={labelClass}>Concurrent Workers</label>
                   <input
                     type="number"
                     min={1}
                     max={20}
                     value={form.scan_config.max_workers}
                     onChange={e => setForm({ ...form, scan_config: { ...form.scan_config, max_workers: parseInt(e.target.value) || 5 } })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className={inputClass}
                   />
                 </div>
               </div>
               {form.scan_config.user_selection === 'specific' && (
                 <div className="mt-3">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">User Emails (one per line)</label>
+                  <label className={labelClass}>User Emails (one per line)</label>
                   <textarea
                     rows={4}
                     placeholder={"user1@company.com\nuser2@company.com\nuser3@company.com"}
                     value={form.scan_config.specific_users_text || ''}
                     onChange={e => setForm({ ...form, scan_config: { ...form.scan_config, specific_users_text: e.target.value } })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-mono"
+                    className={cn(inputClass, 'font-mono')}
                   />
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Enter one email address per line</p>
+                  <p className="text-xs text-text-muted mt-1">Enter one email address per line</p>
                 </div>
               )}
             </div>
 
             {(createMutation.isError || updateMutation.isError) && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-400">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-red-400">
                 {String((createMutation.error as any)?.response?.data?.error?.message || (updateMutation.error as any)?.response?.data?.error?.message || 'Failed to save schedule. Check all fields are filled.')}
               </div>
             )}
@@ -740,14 +743,14 @@ function SchedulesTab() {
               <button
                 type="submit"
                 disabled={createMutation.isPending || updateMutation.isPending}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-500 disabled:opacity-50"
               >
                 {createMutation.isPending || updateMutation.isPending ? 'Saving...' : editingId ? 'Update' : 'Create'}
               </button>
               <button
                 type="button"
                 onClick={resetForm}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="px-4 py-2 text-sm font-medium text-text-secondary bg-white/[0.03] border border-border-glass rounded-lg hover:text-text-primary hover:border-border-glass-hover"
               >
                 Cancel
               </button>
@@ -757,37 +760,37 @@ function SchedulesTab() {
       )}
 
       {/* Scheduled Jobs Table */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
-          <Clock className="w-5 h-5 text-gray-400 dark:text-gray-500" />
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Scheduled Jobs</h2>
+      <div className="glass-panel overflow-hidden">
+        <div className="px-6 py-4 border-b border-border-glass flex items-center gap-2">
+          <Clock className="w-5 h-5 text-text-muted" />
+          <h2 className="text-sm font-semibold text-text-primary">Scheduled Jobs</h2>
         </div>
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 dark:bg-gray-800/50">
+        <table className="min-w-full divide-y divide-border-glass">
+          <thead className="bg-white/[0.02]">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Schedule</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Active</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Run</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Next Run</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Type</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Schedule</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Active</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Last Run</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Next Run</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+          <tbody className="divide-y divide-border-glass">
             {jobs && jobs.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={7} className="px-6 py-12 text-center text-text-muted">
                   No scheduled jobs. Create one to automate scans.
                 </td>
               </tr>
             )}
             {jobs?.map(job => (
-              <tr key={job.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-800/50">
+              <tr key={job.id} className="hover:bg-white/[0.02] transition-colors">
                 <td className="px-6 py-4">
-                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{job.name}</div>
-                  {job.description && <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{job.description}</div>}
-                  <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                  <div className="text-sm font-medium text-text-primary">{job.name}</div>
+                  {job.description && <div className="text-xs text-text-muted mt-0.5">{job.description}</div>}
+                  <div className="text-xs text-text-muted mt-0.5">
                     {job.scan_config?.user_selection === 'specific' && job.scan_config?.specific_users?.length
                       ? `${job.scan_config.specific_users.length} specific user${job.scan_config.specific_users.length > 1 ? 's' : ''}`
                       : job.scan_config?.user_selection === 'limited'
@@ -796,31 +799,31 @@ function SchedulesTab() {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 dark:text-gray-300 dark:text-gray-600">
+                  <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-white/[0.05] text-text-secondary">
                     {job.schedule_type}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-mono">{formatSchedule(job)}</td>
+                <td className="px-6 py-4 text-sm text-text-secondary font-mono">{formatSchedule(job)}</td>
                 <td className="px-6 py-4">
                   {job.is_active
-                    ? <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">Active</span>
-                    : <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 dark:text-gray-400">Inactive</span>}
+                    ? <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-emerald-500/15 text-emerald-400">Active</span>
+                    : <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-white/[0.05] text-text-muted">Inactive</span>}
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(job.last_run_at)}</td>
-                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(job.next_run_at)}</td>
+                <td className="px-6 py-4 text-sm text-text-muted">{formatDate(job.last_run_at)}</td>
+                <td className="px-6 py-4 text-sm text-text-muted">{formatDate(job.next_run_at)}</td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-1">
                     <button
                       onClick={() => runNowMutation.mutate(job.id)}
                       disabled={runNowMutation.isPending}
-                      className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
+                      className="p-1.5 text-text-muted hover:text-emerald-400 hover:bg-emerald-500/10 rounded"
                       title="Run Now"
                     >
                       <Play className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => startEdit(job)}
-                      className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                      className="p-1.5 text-text-muted hover:text-blue-400 hover:bg-blue-500/10 rounded"
                       title="Edit"
                     >
                       <Pencil className="w-4 h-4" />
@@ -829,13 +832,13 @@ function SchedulesTab() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => deleteMutation.mutate(job.id)}
-                          className="px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded hover:bg-red-200 dark:hover:bg-red-800"
+                          className="px-2 py-1 text-xs font-medium text-red-400 bg-red-500/15 rounded hover:bg-red-500/25"
                         >
                           Confirm
                         </button>
                         <button
                           onClick={() => setDeleteConfirm(null)}
-                          className="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                          className="px-2 py-1 text-xs font-medium text-text-muted bg-white/[0.05] rounded hover:text-text-secondary"
                         >
                           Cancel
                         </button>
@@ -843,7 +846,7 @@ function SchedulesTab() {
                     ) : (
                       <button
                         onClick={() => setDeleteConfirm(job.id)}
-                        className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                        className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded"
                         title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -858,25 +861,25 @@ function SchedulesTab() {
       </div>
 
       {/* Execution History */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
-          <History className="w-5 h-5 text-gray-400 dark:text-gray-500" />
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Execution History</h2>
+      <div className="glass-panel overflow-hidden">
+        <div className="px-6 py-4 border-b border-border-glass flex items-center gap-2">
+          <History className="w-5 h-5 text-text-muted" />
+          <h2 className="text-sm font-semibold text-text-primary">Execution History</h2>
         </div>
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 dark:bg-gray-800/50">
+        <table className="min-w-full divide-y divide-border-glass">
+          <thead className="bg-white/[0.02]">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Job Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Users</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Started At</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Job Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Users</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Duration</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Started At</th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+          <tbody className="divide-y divide-border-glass">
             {(!historyData?.items || historyData.items.length === 0) && (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={5} className="px-6 py-12 text-center text-text-muted">
                   No execution history yet.
                 </td>
               </tr>
@@ -885,23 +888,23 @@ function SchedulesTab() {
               <tr
                 key={exec.id}
                 onClick={() => setSelectedScanId(exec.id)}
-                className="hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                className="hover:bg-white/[0.02] cursor-pointer transition-colors"
               >
-                <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{exec.job_name}</td>
+                <td className="px-6 py-4 text-sm font-medium text-text-primary">{exec.job_name}</td>
                 <td className="px-6 py-4">
                   <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColor(exec.status)}`}>
                     {exec.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                  <span className="text-green-600 dark:text-green-400">{exec.successful_users}</span>
+                <td className="px-6 py-4 text-sm text-text-secondary">
+                  <span className="text-emerald-400">{exec.successful_users}</span>
                   {exec.failed_users > 0 && (
-                    <span className="text-red-600 dark:text-red-400">/{exec.failed_users} failed</span>
+                    <span className="text-red-400">/{exec.failed_users} failed</span>
                   )}
-                  <span className="text-gray-400 dark:text-gray-500"> of {exec.total_users}</span>
+                  <span className="text-text-muted"> of {exec.total_users}</span>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDuration(exec.duration_seconds)}</td>
-                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(exec.started_at)}</td>
+                <td className="px-6 py-4 text-sm text-text-muted">{formatDuration(exec.duration_seconds)}</td>
+                <td className="px-6 py-4 text-sm text-text-muted">{formatDate(exec.started_at)}</td>
               </tr>
             ))}
           </tbody>
@@ -1079,16 +1082,18 @@ function NotificationsTab() {
     return colors[severity] || 'bg-gray-400';
   }
 
+  const inputClass = 'w-full px-3 py-2 bg-bg-input border border-border-glass rounded-lg text-sm text-text-primary focus:border-accent focus:ring-2 focus:ring-accent-glow outline-none';
+
   if (isLoading) {
     return (
       <div className="space-y-4">
         {[0, 1].map(i => (
-          <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 animate-pulse">
+          <div key={i} className="glass-panel p-6 animate-pulse">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800" />
+              <div className="w-10 h-10 rounded-lg bg-white/[0.05]" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 w-32 bg-gray-100 dark:bg-gray-800 rounded" />
-                <div className="h-3 w-64 bg-gray-100 dark:bg-gray-800 rounded" />
+                <div className="h-4 w-32 bg-white/[0.05] rounded" />
+                <div className="h-3 w-64 bg-white/[0.05] rounded" />
               </div>
             </div>
           </div>
@@ -1098,7 +1103,7 @@ function NotificationsTab() {
   }
 
   if (error) {
-    return <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-700 dark:text-red-400">Failed to load notification channels.</div>;
+    return <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-400">Failed to load notification channels.</div>;
   }
 
   return (
@@ -1106,17 +1111,17 @@ function NotificationsTab() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-text-secondary">
             Configure webhook endpoints to receive real-time notifications for security events.
           </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+          <p className="text-xs text-text-muted mt-1">
             Webhooks follow the <span className="font-medium">Standard Webhooks</span> spec with HMAC-SHA256 signing and automatic retries.
           </p>
         </div>
         {!showForm && (
           <button
             onClick={() => { resetForm(); setShowForm(true); }}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shrink-0"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-500 shrink-0"
           >
             <Plus className="w-4 h-4" />
             Add Webhook
@@ -1126,12 +1131,12 @@ function NotificationsTab() {
 
       {/* Create/Edit Form */}
       {showForm && (
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+        <div className="glass-panel overflow-hidden">
+          <div className="px-6 py-4 border-b border-border-glass flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-text-primary">
               {editingId ? 'Edit Webhook' : 'New Webhook'}
             </h2>
-            <button onClick={resetForm} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded">
+            <button onClick={resetForm} className="p-1 text-text-muted hover:text-text-secondary rounded">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -1140,30 +1145,30 @@ function NotificationsTab() {
             {/* Name + URL */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+                <label className="block text-sm font-medium text-text-secondary mb-1">Name</label>
                 <input
                   type="text"
                   required
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 dark:text-gray-100"
+                  className={inputClass}
                   placeholder="e.g., Slack - #security-alerts"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-text-secondary mb-1">
                   Endpoint URL
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Link2 className="w-4 h-4 text-gray-400" />
+                    <Link2 className="w-4 h-4 text-text-muted" />
                   </div>
                   <input
                     type="url"
                     required
                     value={form.webhook_url}
                     onChange={e => setForm({ ...form, webhook_url: e.target.value })}
-                    className="w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 dark:text-gray-100"
+                    className={cn(inputClass, 'pl-9 font-mono')}
                     placeholder="https://hooks.example.com/webhooks/..."
                   />
                 </div>
@@ -1172,7 +1177,7 @@ function NotificationsTab() {
 
             {/* Event Subscriptions */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Event Subscriptions</label>
+              <label className="block text-sm font-medium text-text-secondary mb-3">Event Subscriptions</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {EVENT_OPTIONS.map(opt => {
                   const isSelected = form.events.includes(opt.value);
@@ -1184,8 +1189,8 @@ function NotificationsTab() {
                       className={cn(
                         'flex items-start gap-3 p-3 rounded-lg border transition-all text-left',
                         isSelected
-                          ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                          ? 'border-blue-500/30 bg-blue-500/10'
+                          : 'border-border-glass hover:border-border-glass-hover'
                       )}
                     >
                       <div className="mt-0.5">
@@ -1193,7 +1198,7 @@ function NotificationsTab() {
                           'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors',
                           isSelected
                             ? 'bg-blue-600 border-blue-600'
-                            : 'border-gray-300 dark:border-gray-600'
+                            : 'border-border-glass-hover'
                         )}>
                           {isSelected && (
                             <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -1205,18 +1210,18 @@ function NotificationsTab() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className={cn('w-1.5 h-1.5 rounded-full', severityDot(opt.severity))} />
-                          <span className={cn('text-sm font-medium', isSelected ? 'text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300')}>
+                          <span className={cn('text-sm font-medium', isSelected ? 'text-text-primary' : 'text-text-secondary')}>
                             {opt.label}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{opt.description}</p>
+                        <p className="text-xs text-text-muted mt-0.5">{opt.description}</p>
                       </div>
                     </button>
                   );
                 })}
               </div>
               {form.events.length === 0 && (
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1">
+                <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
                   <Info className="w-3 h-3" /> Select at least one event to receive notifications.
                 </p>
               )}
@@ -1227,7 +1232,7 @@ function NotificationsTab() {
               <button
                 type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                className="flex items-center gap-2 text-sm font-medium text-text-muted hover:text-text-secondary transition-colors"
               >
                 {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 Advanced Settings
@@ -1237,13 +1242,13 @@ function NotificationsTab() {
                 <div className="mt-4 space-y-4 pl-0">
                   {/* Signing Secret */}
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      <Key className="w-3.5 h-3.5 text-gray-400" />
+                    <label className="flex items-center gap-2 text-sm font-medium text-text-secondary mb-1">
+                      <Key className="w-3.5 h-3.5 text-text-muted" />
                       Signing Secret
-                      <span className="text-xs text-gray-400 dark:text-gray-500 font-normal">(HMAC-SHA256)</span>
+                      <span className="text-xs text-text-muted font-normal">(HMAC-SHA256)</span>
                     </label>
                     {editingId && !form.hmac_secret && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                      <p className="text-xs text-text-muted mb-1.5">
                         {(channels?.find(c => c.id === editingId)?.has_secret)
                           ? 'A signing secret is configured. Enter a new value to replace it, or leave blank to keep.'
                           : 'No signing secret configured.'}
@@ -1254,26 +1259,26 @@ function NotificationsTab() {
                         type={showSecret ? 'text' : 'password'}
                         value={form.hmac_secret}
                         onChange={e => setForm({ ...form, hmac_secret: e.target.value })}
-                        className="w-full px-3 py-2 pr-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 dark:text-gray-100"
+                        className={cn(inputClass, 'pr-10 font-mono')}
                         placeholder="whsec_..."
                       />
                       <button
                         type="button"
                         onClick={() => setShowSecret(!showSecret)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-muted hover:text-text-secondary"
                       >
                         {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                      Payloads are signed with <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs">Webhook-Signature</code> header per Standard Webhooks spec.
+                    <p className="text-xs text-text-muted mt-1">
+                      Payloads are signed with <code className="px-1 py-0.5 bg-white/[0.05] rounded text-xs">Webhook-Signature</code> header per Standard Webhooks spec.
                     </p>
                   </div>
 
                   {/* Custom Headers */}
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      <Hash className="w-3.5 h-3.5 text-gray-400" />
+                    <label className="flex items-center gap-2 text-sm font-medium text-text-secondary mb-2">
+                      <Hash className="w-3.5 h-3.5 text-text-muted" />
                       Custom Headers
                     </label>
                     <div className="space-y-2">
@@ -1283,20 +1288,20 @@ function NotificationsTab() {
                             type="text"
                             value={header.key}
                             onChange={e => updateHeader(i, 'key', e.target.value)}
-                            className="w-1/3 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 dark:text-gray-100"
+                            className={cn(inputClass, 'w-1/3 font-mono')}
                             placeholder="Header-Name"
                           />
                           <input
                             type="text"
                             value={header.value}
                             onChange={e => updateHeader(i, 'value', e.target.value)}
-                            className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900 dark:text-gray-100"
+                            className={cn(inputClass, 'flex-1 font-mono')}
                             placeholder="value"
                           />
                           <button
                             type="button"
                             onClick={() => removeHeader(i)}
-                            className="p-2 text-gray-400 hover:text-red-500 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                            className="p-2 text-text-muted hover:text-red-400 rounded hover:bg-red-500/10"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -1305,7 +1310,7 @@ function NotificationsTab() {
                       <button
                         type="button"
                         onClick={addHeader}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-muted border border-dashed border-border-glass rounded-lg hover:border-border-glass-hover hover:text-text-secondary transition-colors"
                       >
                         <Plus className="w-3 h-3" />
                         Add Header
@@ -1318,20 +1323,20 @@ function NotificationsTab() {
 
             {/* Error display */}
             {(createMutation.isError || updateMutation.isError) && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-400">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-red-400">
                 {String((createMutation.error as any)?.response?.data?.error?.message || (updateMutation.error as any)?.response?.data?.error?.message || 'Failed to save webhook. Check all fields.')}
               </div>
             )}
 
             {/* Actions */}
-            <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-800">
-              <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex items-center justify-between pt-2 border-t border-border-glass">
+              <label className="flex items-center gap-2 text-sm text-text-secondary">
                 <button
                   type="button"
                   onClick={() => setForm(prev => ({ ...prev, is_active: !prev.is_active }))}
                   className={cn(
                     'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors',
-                    form.is_active ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+                    form.is_active ? 'bg-blue-600' : 'bg-white/[0.1]'
                   )}
                 >
                   <span className={cn(
@@ -1345,14 +1350,14 @@ function NotificationsTab() {
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                  className="px-4 py-2 text-sm font-medium text-text-secondary bg-white/[0.03] border border-border-glass rounded-lg hover:text-text-primary hover:border-border-glass-hover"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createMutation.isPending || updateMutation.isPending || form.events.length === 0}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {createMutation.isPending || updateMutation.isPending ? 'Saving...' : editingId ? 'Save Changes' : 'Create Webhook'}
                 </button>
@@ -1364,17 +1369,17 @@ function NotificationsTab() {
 
       {/* Channel Cards */}
       {channels && channels.length === 0 && !showForm ? (
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-dashed rounded-lg p-12 text-center">
-          <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-            <Bell className="w-6 h-6 text-gray-400" />
+        <div className="glass-panel border-dashed p-12 text-center">
+          <div className="mx-auto w-12 h-12 rounded-full bg-white/[0.05] flex items-center justify-center mb-4">
+            <Bell className="w-6 h-6 text-text-muted" />
           </div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">No webhooks configured</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 max-w-sm mx-auto">
+          <h3 className="text-sm font-semibold text-text-primary mb-1">No webhooks configured</h3>
+          <p className="text-sm text-text-muted mb-4 max-w-sm mx-auto">
             Add a webhook to receive real-time alerts for scan results, new vulnerabilities, and security events.
           </p>
           <button
             onClick={() => { resetForm(); setShowForm(true); }}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-500"
           >
             <Plus className="w-4 h-4" />
             Add Your First Webhook
@@ -1389,10 +1394,8 @@ function NotificationsTab() {
               <div
                 key={ch.id}
                 className={cn(
-                  'bg-white dark:bg-gray-900 border rounded-lg transition-colors',
-                  ch.is_active
-                    ? 'border-gray-200 dark:border-gray-800'
-                    : 'border-gray-200 dark:border-gray-800 opacity-60'
+                  'glass-panel transition-colors',
+                  !ch.is_active && 'opacity-60'
                 )}
               >
                 <div className="p-5">
@@ -1402,27 +1405,27 @@ function NotificationsTab() {
                       <div className={cn(
                         'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
                         ch.is_active
-                          ? 'bg-blue-50 dark:bg-blue-900/20'
-                          : 'bg-gray-100 dark:bg-gray-800'
+                          ? 'bg-blue-500/15'
+                          : 'bg-white/[0.05]'
                       )}>
                         <Globe className={cn(
                           'w-4.5 h-4.5',
-                          ch.is_active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'
+                          ch.is_active ? 'text-blue-400' : 'text-text-muted'
                         )} />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{ch.name}</h3>
+                          <h3 className="text-sm font-semibold text-text-primary truncate">{ch.name}</h3>
                           <span className={cn(
                             'inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded',
                             ch.is_active
-                              ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                              : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-500'
+                              ? 'bg-emerald-500/15 text-emerald-400'
+                              : 'bg-white/[0.05] text-text-muted'
                           )}>
                             {ch.is_active ? 'Active' : 'Paused'}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">{ch.webhook_url}</p>
+                        <p className="text-xs text-text-muted font-mono mt-0.5 truncate">{ch.webhook_url}</p>
                       </div>
                     </div>
 
@@ -1433,8 +1436,8 @@ function NotificationsTab() {
                         className={cn(
                           'p-1.5 rounded transition-colors',
                           ch.is_active
-                            ? 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
-                            : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            ? 'text-emerald-400 hover:bg-emerald-500/10'
+                            : 'text-text-muted hover:bg-white/[0.05]'
                         )}
                         title={ch.is_active ? 'Pause webhook' : 'Enable webhook'}
                       >
@@ -1445,15 +1448,15 @@ function NotificationsTab() {
                       <button
                         onClick={() => handleTest(ch.id)}
                         disabled={testResults[ch.id] === 'loading'}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                        className="p-1.5 text-text-muted hover:text-blue-400 hover:bg-blue-500/10 rounded transition-colors"
                         title="Send test event"
                       >
                         {testResults[ch.id] === 'loading' ? (
-                          <Send className="w-4 h-4 animate-pulse text-blue-500" />
+                          <Send className="w-4 h-4 animate-pulse text-blue-400" />
                         ) : testResults[ch.id] === 'success' ? (
-                          <CheckCircle className="w-4 h-4 text-green-600" />
+                          <CheckCircle className="w-4 h-4 text-emerald-400" />
                         ) : testResults[ch.id] === 'error' ? (
-                          <XCircle className="w-4 h-4 text-red-600" />
+                          <XCircle className="w-4 h-4 text-red-400" />
                         ) : (
                           <Send className="w-4 h-4" />
                         )}
@@ -1462,7 +1465,7 @@ function NotificationsTab() {
                       {/* Edit */}
                       <button
                         onClick={() => startEdit(ch)}
-                        className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                        className="p-1.5 text-text-muted hover:text-text-secondary hover:bg-white/[0.05] rounded transition-colors"
                         title="Edit"
                       >
                         <Pencil className="w-4 h-4" />
@@ -1473,13 +1476,13 @@ function NotificationsTab() {
                         <div className="flex items-center gap-1 ml-1">
                           <button
                             onClick={() => deleteMutation.mutate(ch.id)}
-                            className="px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded hover:bg-red-200 dark:hover:bg-red-800"
+                            className="px-2 py-1 text-xs font-medium text-red-400 bg-red-500/15 rounded hover:bg-red-500/25"
                           >
                             Delete
                           </button>
                           <button
                             onClick={() => setDeleteConfirm(null)}
-                            className="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                            className="px-2 py-1 text-xs font-medium text-text-muted bg-white/[0.05] rounded hover:text-text-secondary"
                           >
                             Cancel
                           </button>
@@ -1487,7 +1490,7 @@ function NotificationsTab() {
                       ) : (
                         <button
                           onClick={() => setDeleteConfirm(ch.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                          className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1504,7 +1507,7 @@ function NotificationsTab() {
                         return (
                           <span
                             key={ev}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-white/[0.05] text-text-secondary"
                           >
                             {eventInfo && <span className={cn('w-1 h-1 rounded-full', severityDot(eventInfo.severity))} />}
                             {ev.replace(/_/g, ' ')}
@@ -1512,7 +1515,7 @@ function NotificationsTab() {
                         );
                       })}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500 shrink-0">
+                    <div className="flex items-center gap-3 text-xs text-text-muted shrink-0">
                       {ch.has_secret && (
                         <span className="flex items-center gap-1" title="Signing secret configured">
                           <Key className="w-3 h-3" /> Signed

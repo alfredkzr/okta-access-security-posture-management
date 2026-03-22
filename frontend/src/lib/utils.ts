@@ -6,23 +6,34 @@ export function cn(...inputs: ClassValue[]) {
 
 export function severityColor(s: string): string {
   switch (s.toUpperCase()) {
-    case 'CRITICAL': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-    case 'HIGH': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
-    case 'MEDIUM': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-    case 'LOW': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-    default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+    case 'CRITICAL': return 'bg-red-500/15 text-red-400 border-red-500/20';
+    case 'HIGH': return 'bg-orange-500/15 text-orange-400 border-orange-500/20';
+    case 'MEDIUM': return 'bg-yellow-500/15 text-yellow-400 border-yellow-500/20';
+    case 'LOW': return 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20';
+    default: return 'bg-slate-500/15 text-slate-400 border-slate-500/20';
+  }
+}
+
+export function severityDot(s: string): string {
+  switch (s.toUpperCase()) {
+    case 'CRITICAL': return 'bg-red-500';
+    case 'HIGH': return 'bg-orange-500';
+    case 'MEDIUM': return 'bg-yellow-500';
+    case 'LOW': return 'bg-cyan-500';
+    default: return 'bg-slate-500';
   }
 }
 
 export function statusColor(s: string): string {
   switch (s.toUpperCase()) {
-    case 'ACTIVE': case 'OPEN': case 'FAILED': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-    case 'CLOSED': return 'bg-gray-100 text-gray-800 dark:bg-gray-700/30 dark:text-gray-400';
-    case 'RESOLVED': case 'COMPLETED': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-    case 'ACKNOWLEDGED': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-    case 'RUNNING': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-    case 'PENDING': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-    default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+    case 'ACTIVE': case 'OPEN': case 'FAILED': return 'bg-red-500/15 text-red-400';
+    case 'CLOSED': return 'bg-slate-500/15 text-slate-400';
+    case 'RESOLVED': case 'COMPLETED': return 'bg-emerald-500/15 text-emerald-400';
+    case 'ACKNOWLEDGED': return 'bg-blue-500/15 text-blue-400';
+    case 'RUNNING': return 'bg-blue-500/15 text-blue-400';
+    case 'PENDING': return 'bg-yellow-500/15 text-yellow-400';
+    case 'COMPLETED_WITH_ERRORS': return 'bg-yellow-500/15 text-yellow-400';
+    default: return 'bg-slate-500/15 text-slate-400';
   }
 }
 
@@ -34,10 +45,10 @@ export function formatDate(iso: string | null): string {
 }
 
 export function riskScoreColor(score: number): string {
-  if (score >= 76) return 'text-red-600 dark:text-red-400';
-  if (score >= 51) return 'text-orange-600 dark:text-orange-400';
-  if (score >= 26) return 'text-yellow-600 dark:text-yellow-400';
-  return 'text-green-600 dark:text-green-400';
+  if (score >= 76) return 'text-red-400';
+  if (score >= 51) return 'text-orange-400';
+  if (score >= 26) return 'text-yellow-400';
+  return 'text-emerald-400';
 }
 
 export function formatDuration(seconds: number | null): string {

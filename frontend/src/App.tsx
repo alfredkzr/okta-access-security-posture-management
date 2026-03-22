@@ -14,8 +14,8 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
-        <div className="text-gray-400 dark:text-gray-500 text-sm">Loading...</div>
+      <div className="min-h-screen bg-bg-base flex items-center justify-center">
+        <div className="text-text-muted text-sm">Loading...</div>
       </div>
     );
   }
