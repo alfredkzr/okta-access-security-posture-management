@@ -31,7 +31,7 @@ export default function ScanDetailModal({ scanId, onClose }: Props) {
   });
 
   return (
-    <div className="glass-modal-overlay flex items-center justify-center z-50 p-6" onClick={onClose}>
+    <div className="fixed inset-0 glass-modal-overlay flex items-center justify-center z-50 p-6" onClick={onClose}>
       <div
         className="glass-modal w-full max-w-2xl max-h-[85vh] flex flex-col"
         onClick={e => e.stopPropagation()}
